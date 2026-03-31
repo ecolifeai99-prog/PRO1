@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * AI-Driven Process Intelligence and Risk Governance Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -54,6 +54,32 @@ export interface EventWithRisk {
   recommendation: string;
 }
 
+export type EventWithFullAnalysisRiskLevel =
+  (typeof EventWithFullAnalysisRiskLevel)[keyof typeof EventWithFullAnalysisRiskLevel];
+
+export const EventWithFullAnalysisRiskLevel = {
+  Low: "Low",
+  Medium: "Medium",
+  High: "High",
+} as const;
+
+export interface EventWithFullAnalysis {
+  id: string;
+  process_name: string;
+  event_type: string;
+  severity: number;
+  likelihood: number;
+  timestamp: string;
+  risk_score: number;
+  risk_level: EventWithFullAnalysisRiskLevel;
+  recommendation: string;
+  weighted_score: number;
+  anomaly_score: number;
+  is_anomaly: boolean;
+  confidence: number;
+  contributing_factors: string[];
+}
+
 export interface AnalyticsSummary {
   total_events: number;
   high_risk_count: number;
@@ -75,4 +101,112 @@ export interface ProcessEventCount {
   high_risk: number;
   medium_risk: number;
   low_risk: number;
+}
+
+export interface AnomalyResult {
+  id: string;
+  process_name: string;
+  event_type: string;
+  risk_score: number;
+  z_score: number;
+  anomaly_score: number;
+  is_anomaly: boolean;
+  timestamp: string;
+}
+
+export type ProcessTrendTrendDirection =
+  (typeof ProcessTrendTrendDirection)[keyof typeof ProcessTrendTrendDirection];
+
+export const ProcessTrendTrendDirection = {
+  rising: "rising",
+  falling: "falling",
+  stable: "stable",
+} as const;
+
+export interface TimeSeriesPoint {
+  timestamp: string;
+  risk_score: number;
+  ema: number;
+}
+
+export interface ProcessTrend {
+  process_name: string;
+  ema_current: number;
+  ema_previous: number;
+  trend_direction: ProcessTrendTrendDirection;
+  trend_strength: number;
+  event_count: number;
+  time_series: TimeSeriesPoint[];
+}
+
+export type ProcessHealthHealthLabel =
+  (typeof ProcessHealthHealthLabel)[keyof typeof ProcessHealthHealthLabel];
+
+export const ProcessHealthHealthLabel = {
+  Critical: "Critical",
+  Poor: "Poor",
+  Fair: "Fair",
+  Good: "Good",
+  Excellent: "Excellent",
+} as const;
+
+export interface ProcessHealth {
+  process_name: string;
+  health_score: number;
+  health_label: ProcessHealthHealthLabel;
+  event_count: number;
+  avg_severity: number;
+  avg_likelihood: number;
+  high_risk_ratio: number;
+  recency_penalty: number;
+}
+
+export type RiskPredictionPredictedRiskLevel =
+  (typeof RiskPredictionPredictedRiskLevel)[keyof typeof RiskPredictionPredictedRiskLevel];
+
+export const RiskPredictionPredictedRiskLevel = {
+  Low: "Low",
+  Medium: "Medium",
+  High: "High",
+} as const;
+
+export interface RiskPrediction {
+  process_name: string;
+  risk_velocity: number;
+  predicted_risk_score: number;
+  predicted_risk_level: RiskPredictionPredictedRiskLevel;
+  confidence_interval_low: number;
+  confidence_interval_high: number;
+  regression_slope: number;
+  data_points: number;
+}
+
+export interface MlAlgorithmInfo {
+  name: string;
+  type: string;
+  description: string;
+  formula: string;
+  use_case: string;
+  accuracy: number;
+}
+
+export interface MlModelInfo {
+  model_version: string;
+  total_algorithms: number;
+  algorithms: MlAlgorithmInfo[];
+  last_trained: string;
+  training_samples: number;
+}
+
+export interface MlModelStats {
+  total_events_analyzed: number;
+  anomalies_detected: number;
+  anomaly_rate: number;
+  avg_confidence: number;
+  processes_monitored: number;
+  high_risk_processes: number;
+  model_accuracy: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
 }

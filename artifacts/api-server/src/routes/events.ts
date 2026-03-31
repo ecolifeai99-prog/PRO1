@@ -1,6 +1,13 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "crypto";
-import { events, withRisk, type ProcessEvent } from "../store";
+import {
+  events,
+  withRisk,
+  computeWeightedScore,
+  computeConfidence,
+  computeContributingFactors,
+  type ProcessEvent,
+} from "../store";
 
 const router: IRouter = Router();
 
@@ -58,7 +65,32 @@ router.post("/events", (req, res) => {
 
   events.push(newEvent);
 
-  res.status(201).json(withRisk(newEvent));
+  // Compute full ML analysis for the response
+  const riskData = withRisk(newEvent);
+  const weighted_score = computeWeightedScore(sev, lik);
+  const confidence = computeConfidence(sev, lik);
+  const contributing_factors = computeContributingFactors(sev, lik);
+
+  // Z-score anomaly detection against current population
+  const allScores = events.map((e) => e.severity * e.likelihood);
+  const mean = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+  const variance = allScores.reduce((s, v) => s + (v - mean) ** 2, 0) / allScores.length;
+  const stddev = Math.sqrt(variance) || 1;
+  const zScore = (riskData.risk_score - mean) / stddev;
+  const maxAbsZ = Math.max(
+    ...allScores.map((s) => Math.abs((s - mean) / stddev)),
+  ) || 1;
+  const anomaly_score = Math.round((Math.abs(zScore) / maxAbsZ) * 100) / 100;
+  const is_anomaly = Math.abs(zScore) > 2;
+
+  res.status(201).json({
+    ...riskData,
+    weighted_score,
+    anomaly_score,
+    is_anomaly,
+    confidence,
+    contributing_factors,
+  });
 });
 
 /**

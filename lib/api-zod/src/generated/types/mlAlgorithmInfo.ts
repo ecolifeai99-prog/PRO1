@@ -6,7 +6,11 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface DeleteResponse {
-  success: boolean;
-  message: string;
+export interface MlAlgorithmInfo {
+  name: string;
+  type: string;
+  description: string;
+  formula: string;
+  use_case: string;
+  accuracy: number;
 }

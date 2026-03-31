@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, PlusCircle, AlertTriangle, BarChart3, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, PlusCircle, AlertTriangle, BarChart3, ShieldAlert, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -7,6 +7,10 @@ const navItems = [
   { name: "Add Event", href: "/add-event", icon: PlusCircle },
   { name: "Risk Analysis", href: "/risk-analysis", icon: AlertTriangle },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+];
+
+const intelligenceNavItems = [
+  { name: "AI Engine", href: "/ai-engine", icon: Brain },
 ];
 
 export function Sidebar() {
@@ -20,6 +24,25 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => {
+          const isActive = location === item.href;
+          return (
+            <Link key={item.href} href={item.href} className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            )} data-testid={`nav-${item.name.toLowerCase().replace(" ", "-")}`}>
+              <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-sidebar-foreground/70")} />
+              {item.name}
+            </Link>
+          );
+        })}
+
+        <div className="pt-4 pb-1">
+          <div className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
+            Intelligence
+          </div>
+        </div>
+
+        {intelligenceNavItems.map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.href} href={item.href} className={cn(

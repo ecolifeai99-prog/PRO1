@@ -3,12 +3,11 @@
  * Do not edit manually.
  * Api
  * AI-Driven Process Intelligence and Risk Governance Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -16,7 +15,6 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * Returns all stored process events with risk analysis
  * @summary Get all events
  */
 export const GetEventsResponseItem = zod.object({
@@ -33,7 +31,6 @@ export const GetEventsResponseItem = zod.object({
 export const GetEventsResponse = zod.array(GetEventsResponseItem);
 
 /**
- * Add a new process event to in-memory store
  * @summary Submit a new event
  */
 export const createEventBodySeverityMax = 5;
@@ -79,7 +76,6 @@ export const DeleteEventResponse = zod.object({
 });
 
 /**
- * Returns total counts, risk distribution, and recent activity
  * @summary Dashboard summary statistics
  */
 export const GetAnalyticsSummaryResponse = zod.object({
@@ -104,7 +100,6 @@ export const GetAnalyticsSummaryResponse = zod.object({
 });
 
 /**
- * Returns count of events per risk level for pie chart
  * @summary Risk level distribution
  */
 export const GetRiskDistributionResponse = zod.object({
@@ -114,8 +109,7 @@ export const GetRiskDistributionResponse = zod.object({
 });
 
 /**
- * Returns event counts per process for bar chart
- * @summary Events grouped by process name
+ * @summary Events grouped by process
  */
 export const GetEventsPerProcessResponseItem = zod.object({
   process_name: zod.string(),
@@ -129,7 +123,6 @@ export const GetEventsPerProcessResponse = zod.array(
 );
 
 /**
- * Returns the 5 most recent high-risk events for the activity feed
  * @summary Recent high-risk events
  */
 export const GetRecentActivityResponseItem = zod.object({
@@ -146,3 +139,112 @@ export const GetRecentActivityResponseItem = zod.object({
 export const GetRecentActivityResponse = zod.array(
   GetRecentActivityResponseItem,
 );
+
+/**
+ * Returns metadata about all ML algorithms used in the platform
+ * @summary ML model and algorithm information
+ */
+export const GetMlModelInfoResponse = zod.object({
+  model_version: zod.string(),
+  total_algorithms: zod.number(),
+  algorithms: zod.array(
+    zod.object({
+      name: zod.string(),
+      type: zod.string(),
+      description: zod.string(),
+      formula: zod.string(),
+      use_case: zod.string(),
+      accuracy: zod.number(),
+    }),
+  ),
+  last_trained: zod.string(),
+  training_samples: zod.number(),
+});
+
+/**
+ * Returns anomaly scores for all events using Z-score statistical analysis
+ * @summary Z-score anomaly detection results
+ */
+export const GetMlAnomaliesResponseItem = zod.object({
+  id: zod.string(),
+  process_name: zod.string(),
+  event_type: zod.string(),
+  risk_score: zod.number(),
+  z_score: zod.number(),
+  anomaly_score: zod.number(),
+  is_anomaly: zod.boolean(),
+  timestamp: zod.string(),
+});
+export const GetMlAnomaliesResponse = zod.array(GetMlAnomaliesResponseItem);
+
+/**
+ * Returns EMA-based risk trend per process over time
+ * @summary Exponential Moving Average risk trend analysis
+ */
+export const GetMlTrendsResponseItem = zod.object({
+  process_name: zod.string(),
+  ema_current: zod.number(),
+  ema_previous: zod.number(),
+  trend_direction: zod.enum(["rising", "falling", "stable"]),
+  trend_strength: zod.number(),
+  event_count: zod.number(),
+  time_series: zod.array(
+    zod.object({
+      timestamp: zod.string(),
+      risk_score: zod.number(),
+      ema: zod.number(),
+    }),
+  ),
+});
+export const GetMlTrendsResponse = zod.array(GetMlTrendsResponseItem);
+
+/**
+ * Returns a weighted health index per process using multi-factor scoring
+ * @summary Composite process health scores
+ */
+export const GetMlProcessHealthResponseItem = zod.object({
+  process_name: zod.string(),
+  health_score: zod.number(),
+  health_label: zod.enum(["Critical", "Poor", "Fair", "Good", "Excellent"]),
+  event_count: zod.number(),
+  avg_severity: zod.number(),
+  avg_likelihood: zod.number(),
+  high_risk_ratio: zod.number(),
+  recency_penalty: zod.number(),
+});
+export const GetMlProcessHealthResponse = zod.array(
+  GetMlProcessHealthResponseItem,
+);
+
+/**
+ * Returns risk velocity and predicted next risk level per process using linear regression
+ * @summary Risk velocity and next-event predictions
+ */
+export const GetMlPredictionsResponseItem = zod.object({
+  process_name: zod.string(),
+  risk_velocity: zod.number(),
+  predicted_risk_score: zod.number(),
+  predicted_risk_level: zod.enum(["Low", "Medium", "High"]),
+  confidence_interval_low: zod.number(),
+  confidence_interval_high: zod.number(),
+  regression_slope: zod.number(),
+  data_points: zod.number(),
+});
+export const GetMlPredictionsResponse = zod.array(GetMlPredictionsResponseItem);
+
+/**
+ * Returns aggregate model metrics across all algorithms
+ * @summary Overall ML model performance statistics
+ */
+export const GetMlModelStatsResponse = zod.object({
+  total_events_analyzed: zod.number(),
+  anomalies_detected: zod.number(),
+  anomaly_rate: zod.number(),
+  avg_confidence: zod.number(),
+  processes_monitored: zod.number(),
+  high_risk_processes: zod.number(),
+  model_accuracy: zod.number(),
+  precision: zod.number(),
+  recall: zod.number(),
+  f1_score: zod.number(),
+});

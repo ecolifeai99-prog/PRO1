@@ -10,7 +10,7 @@ import {
   getGetRiskDistributionQueryKey,
   getGetEventsPerProcessQueryKey,
   getGetRecentActivityQueryKey,
-  type EventWithRisk
+  type EventWithFullAnalysis
 } from "@workspace/api-client-react";
 import {
   Form,
@@ -42,7 +42,7 @@ export default function AddEvent() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const createEvent = useCreateEvent();
-  const [successEvent, setSuccessEvent] = useState<EventWithRisk | null>(null);
+  const [successEvent, setSuccessEvent] = useState<EventWithFullAnalysis | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -87,7 +87,7 @@ export default function AddEvent() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Record Process Event</h1>
         <p className="text-muted-foreground mt-1">
@@ -95,8 +95,8 @@ export default function AddEvent() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="shadow-sm border-t-4 border-t-primary">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="shadow-sm border-t-4 border-t-primary h-fit">
           <CardHeader>
             <CardTitle>Event Details</CardTitle>
             <CardDescription>Enter the specifics of the process interruption.</CardDescription>
@@ -203,25 +203,45 @@ export default function AddEvent() {
 
         <div className="flex flex-col h-full">
           {successEvent ? (
-            <Card className="shadow-lg border-primary/20 bg-primary/5 h-full flex flex-col animate-in fade-in slide-in-from-bottom-4">
+            <Card className="shadow-lg border-primary/20 bg-primary/5 flex flex-col animate-in fade-in slide-in-from-bottom-4">
               <CardHeader className="bg-card border-b rounded-t-lg pb-4">
                 <CardTitle className="flex items-center gap-2 text-primary">
                   <CheckCircle2 className="h-6 w-6" /> Analysis Complete
                 </CardTitle>
                 <CardDescription>Risk intelligence engine has processed the event.</CardDescription>
               </CardHeader>
-              <CardContent className="pt-8 flex-1 space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-card p-6 rounded-lg border shadow-sm flex flex-col items-center justify-center text-center">
-                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Risk Score</span>
+              <CardContent className="pt-6 flex-1 space-y-6">
+                {successEvent.is_anomaly && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 flex items-center gap-2 text-destructive" data-testid="anomaly-banner">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-semibold">Anomaly Detected</span>
+                    <span className="text-sm ml-auto opacity-80">Score: {(successEvent.anomaly_score * 100).toFixed(0)}%</span>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col items-center justify-center text-center">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Base Score</span>
                     <div className="flex items-baseline">
-                      <span className="text-5xl font-black font-mono">{successEvent.risk_score}</span>
-                      <span className="text-sm text-muted-foreground ml-1">/ 25</span>
+                      <span className="text-3xl font-black font-mono" data-testid="text-risk-score">{successEvent.risk_score}</span>
+                      <span className="text-xs text-muted-foreground ml-1">/ 25</span>
                     </div>
                   </div>
-                  <div className="bg-card p-6 rounded-lg border shadow-sm flex flex-col items-center justify-center text-center">
-                    <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Classification</span>
-                    <RiskBadge level={successEvent.risk_level} />
+                  <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col items-center justify-center text-center">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Weighted Score</span>
+                    <div className="flex items-baseline">
+                      <span className="text-3xl font-black font-mono text-primary" data-testid="text-weighted-score">{successEvent.weighted_score.toFixed(1)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col items-center justify-center text-center">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Confidence</span>
+                    <div className="flex items-baseline">
+                      <span className="text-3xl font-black font-mono" data-testid="text-confidence">{(successEvent.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+                  <div className="bg-card p-4 rounded-lg border shadow-sm flex flex-col items-center justify-center text-center">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Classification</span>
+                    <RiskBadge level={successEvent.risk_level as any} />
                   </div>
                 </div>
 
@@ -229,17 +249,28 @@ export default function AddEvent() {
                   <h4 className="font-semibold text-sm flex items-center gap-2 mb-3 uppercase tracking-wider text-muted-foreground">
                     <ShieldAlert className="h-4 w-4 text-primary" /> Required Action
                   </h4>
-                  <p className="text-base font-medium text-foreground leading-relaxed">{successEvent.recommendation}</p>
+                  <p className="text-base font-medium text-foreground leading-relaxed" data-testid="text-recommendation">{successEvent.recommendation}</p>
                 </div>
+
+                {successEvent.contributing_factors && successEvent.contributing_factors.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Contributing Factors</h4>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {successEvent.contributing_factors.map((factor, idx) => (
+                        <li key={idx} className="text-sm text-foreground/80" data-testid={`text-factor-${idx}`}>{factor}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </CardContent>
-              <CardFooter className="pt-6">
-                <Button variant="outline" className="w-full bg-card" onClick={handleReset} data-testid="button-add-another">
+              <CardFooter className="pt-4 bg-card rounded-b-lg border-t">
+                <Button variant="outline" className="w-full" onClick={handleReset} data-testid="button-add-another">
                   Log Another Event
                 </Button>
               </CardFooter>
             </Card>
           ) : (
-            <Card className="h-full border-dashed border-2 flex flex-col items-center justify-center text-center p-8 text-muted-foreground shadow-none bg-muted/20">
+            <Card className="h-full border-dashed border-2 flex flex-col items-center justify-center text-center p-8 text-muted-foreground shadow-none bg-muted/20 min-h-[400px]">
               <div className="bg-muted p-4 rounded-full mb-6">
                 <AlertCircle className="h-10 w-10 opacity-50" />
               </div>

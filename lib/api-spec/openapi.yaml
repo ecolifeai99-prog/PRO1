@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: AI-Driven Process Intelligence and Risk Governance Platform API
 servers:
   - url: /api
@@ -13,13 +13,14 @@ tags:
     description: Process event management
   - name: analytics
     description: Analytics and risk summaries
+  - name: ml
+    description: Machine learning model insights
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -33,7 +34,6 @@ paths:
       operationId: getEvents
       tags: [events]
       summary: Get all events
-      description: Returns all stored process events with risk analysis
       responses:
         "200":
           description: List of events
@@ -47,7 +47,6 @@ paths:
       operationId: createEvent
       tags: [events]
       summary: Submit a new event
-      description: Add a new process event to in-memory store
       requestBody:
         required: true
         content:
@@ -56,11 +55,11 @@ paths:
               $ref: "#/components/schemas/CreateEventInput"
       responses:
         "201":
-          description: Event created
+          description: Event created with risk + ML analysis
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EventWithRisk"
+                $ref: "#/components/schemas/EventWithFullAnalysis"
         "400":
           description: Validation error
           content:
@@ -104,7 +103,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Deleted successfully
+          description: Deleted
           content:
             application/json:
               schema:
@@ -121,7 +120,6 @@ paths:
       operationId: getAnalyticsSummary
       tags: [analytics]
       summary: Dashboard summary statistics
-      description: Returns total counts, risk distribution, and recent activity
       responses:
         "200":
           description: Summary stats
@@ -135,7 +133,6 @@ paths:
       operationId: getRiskDistribution
       tags: [analytics]
       summary: Risk level distribution
-      description: Returns count of events per risk level for pie chart
       responses:
         "200":
           description: Risk distribution
@@ -148,8 +145,7 @@ paths:
     get:
       operationId: getEventsPerProcess
       tags: [analytics]
-      summary: Events grouped by process name
-      description: Returns event counts per process for bar chart
+      summary: Events grouped by process
       responses:
         "200":
           description: Events per process
@@ -165,7 +161,6 @@ paths:
       operationId: getRecentActivity
       tags: [analytics]
       summary: Recent high-risk events
-      description: Returns the 5 most recent high-risk events for the activity feed
       responses:
         "200":
           description: Recent activity
@@ -176,6 +171,98 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventWithRisk"
 
+  /ml/model-info:
+    get:
+      operationId: getMlModelInfo
+      tags: [ml]
+      summary: ML model and algorithm information
+      description: Returns metadata about all ML algorithms used in the platform
+      responses:
+        "200":
+          description: Model info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlModelInfo"
+
+  /ml/anomalies:
+    get:
+      operationId: getMlAnomalies
+      tags: [ml]
+      summary: Z-score anomaly detection results
+      description: Returns anomaly scores for all events using Z-score statistical analysis
+      responses:
+        "200":
+          description: Anomaly detection results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnomalyResult"
+
+  /ml/trends:
+    get:
+      operationId: getMlTrends
+      tags: [ml]
+      summary: Exponential Moving Average risk trend analysis
+      description: Returns EMA-based risk trend per process over time
+      responses:
+        "200":
+          description: Trend analysis results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProcessTrend"
+
+  /ml/process-health:
+    get:
+      operationId: getMlProcessHealth
+      tags: [ml]
+      summary: Composite process health scores
+      description: Returns a weighted health index per process using multi-factor scoring
+      responses:
+        "200":
+          description: Process health scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProcessHealth"
+
+  /ml/predictions:
+    get:
+      operationId: getMlPredictions
+      tags: [ml]
+      summary: Risk velocity and next-event predictions
+      description: Returns risk velocity and predicted next risk level per process using linear regression
+      responses:
+        "200":
+          description: Prediction results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RiskPrediction"
+
+  /ml/model-stats:
+    get:
+      operationId: getMlModelStats
+      tags: [ml]
+      summary: Overall ML model performance statistics
+      description: Returns aggregate model metrics across all algorithms
+      responses:
+        "200":
+          description: Model performance stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MlModelStats"
+
 components:
   schemas:
     HealthStatus:
@@ -183,16 +270,14 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     ApiError:
       type: object
       properties:
         error:
           type: string
-      required:
-        - error
+      required: [error]
 
     DeleteResponse:
       type: object
@@ -201,9 +286,7 @@ components:
           type: boolean
         message:
           type: string
-      required:
-        - success
-        - message
+      required: [success, message]
 
     CreateEventInput:
       type: object
@@ -220,11 +303,7 @@ components:
           type: integer
           minimum: 1
           maximum: 5
-      required:
-        - process_name
-        - event_type
-        - severity
-        - likelihood
+      required: [process_name, event_type, severity, likelihood]
 
     EventWithRisk:
       type: object
@@ -248,16 +327,43 @@ components:
           enum: [Low, Medium, High]
         recommendation:
           type: string
-      required:
-        - id
-        - process_name
-        - event_type
-        - severity
-        - likelihood
-        - timestamp
-        - risk_score
-        - risk_level
-        - recommendation
+      required: [id, process_name, event_type, severity, likelihood, timestamp, risk_score, risk_level, recommendation]
+
+    EventWithFullAnalysis:
+      type: object
+      properties:
+        id:
+          type: string
+        process_name:
+          type: string
+        event_type:
+          type: string
+        severity:
+          type: integer
+        likelihood:
+          type: integer
+        timestamp:
+          type: string
+        risk_score:
+          type: integer
+        risk_level:
+          type: string
+          enum: [Low, Medium, High]
+        recommendation:
+          type: string
+        weighted_score:
+          type: number
+        anomaly_score:
+          type: number
+        is_anomaly:
+          type: boolean
+        confidence:
+          type: number
+        contributing_factors:
+          type: array
+          items:
+            type: string
+      required: [id, process_name, event_type, severity, likelihood, timestamp, risk_score, risk_level, recommendation, weighted_score, anomaly_score, is_anomaly, confidence, contributing_factors]
 
     AnalyticsSummary:
       type: object
@@ -276,13 +382,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventWithRisk"
-      required:
-        - total_events
-        - high_risk_count
-        - medium_risk_count
-        - low_risk_count
-        - avg_risk_score
-        - recent_events
+      required: [total_events, high_risk_count, medium_risk_count, low_risk_count, avg_risk_score, recent_events]
 
     RiskDistribution:
       type: object
@@ -293,10 +393,7 @@ components:
           type: integer
         low:
           type: integer
-      required:
-        - high
-        - medium
-        - low
+      required: [high, medium, low]
 
     ProcessEventCount:
       type: object
@@ -311,9 +408,161 @@ components:
           type: integer
         low_risk:
           type: integer
-      required:
-        - process_name
-        - count
-        - high_risk
-        - medium_risk
-        - low_risk
+      required: [process_name, count, high_risk, medium_risk, low_risk]
+
+    AnomalyResult:
+      type: object
+      properties:
+        id:
+          type: string
+        process_name:
+          type: string
+        event_type:
+          type: string
+        risk_score:
+          type: integer
+        z_score:
+          type: number
+        anomaly_score:
+          type: number
+        is_anomaly:
+          type: boolean
+        timestamp:
+          type: string
+      required: [id, process_name, event_type, risk_score, z_score, anomaly_score, is_anomaly, timestamp]
+
+    ProcessTrend:
+      type: object
+      properties:
+        process_name:
+          type: string
+        ema_current:
+          type: number
+        ema_previous:
+          type: number
+        trend_direction:
+          type: string
+          enum: [rising, falling, stable]
+        trend_strength:
+          type: number
+        event_count:
+          type: integer
+        time_series:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeSeriesPoint"
+      required: [process_name, ema_current, ema_previous, trend_direction, trend_strength, event_count, time_series]
+
+    TimeSeriesPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+        risk_score:
+          type: integer
+        ema:
+          type: number
+      required: [timestamp, risk_score, ema]
+
+    ProcessHealth:
+      type: object
+      properties:
+        process_name:
+          type: string
+        health_score:
+          type: number
+        health_label:
+          type: string
+          enum: [Critical, Poor, Fair, Good, Excellent]
+        event_count:
+          type: integer
+        avg_severity:
+          type: number
+        avg_likelihood:
+          type: number
+        high_risk_ratio:
+          type: number
+        recency_penalty:
+          type: number
+      required: [process_name, health_score, health_label, event_count, avg_severity, avg_likelihood, high_risk_ratio, recency_penalty]
+
+    RiskPrediction:
+      type: object
+      properties:
+        process_name:
+          type: string
+        risk_velocity:
+          type: number
+        predicted_risk_score:
+          type: number
+        predicted_risk_level:
+          type: string
+          enum: [Low, Medium, High]
+        confidence_interval_low:
+          type: number
+        confidence_interval_high:
+          type: number
+        regression_slope:
+          type: number
+        data_points:
+          type: integer
+      required: [process_name, risk_velocity, predicted_risk_score, predicted_risk_level, confidence_interval_low, confidence_interval_high, regression_slope, data_points]
+
+    MlAlgorithmInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        formula:
+          type: string
+        use_case:
+          type: string
+        accuracy:
+          type: number
+      required: [name, type, description, formula, use_case, accuracy]
+
+    MlModelInfo:
+      type: object
+      properties:
+        model_version:
+          type: string
+        total_algorithms:
+          type: integer
+        algorithms:
+          type: array
+          items:
+            $ref: "#/components/schemas/MlAlgorithmInfo"
+        last_trained:
+          type: string
+        training_samples:
+          type: integer
+      required: [model_version, total_algorithms, algorithms, last_trained, training_samples]
+
+    MlModelStats:
+      type: object
+      properties:
+        total_events_analyzed:
+          type: integer
+        anomalies_detected:
+          type: integer
+        anomaly_rate:
+          type: number
+        avg_confidence:
+          type: number
+        processes_monitored:
+          type: integer
+        high_risk_processes:
+          type: integer
+        model_accuracy:
+          type: number
+        precision:
+          type: number
+        recall:
+          type: number
+        f1_score:
+          type: number
+      required: [total_events_analyzed, anomalies_detected, anomaly_rate, avg_confidence, processes_monitored, high_risk_processes, model_accuracy, precision, recall, f1_score]

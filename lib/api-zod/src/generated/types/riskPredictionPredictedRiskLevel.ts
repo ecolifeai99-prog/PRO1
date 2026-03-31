@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type EventWithRiskRiskLevel =
-  (typeof EventWithRiskRiskLevel)[keyof typeof EventWithRiskRiskLevel];
+export type RiskPredictionPredictedRiskLevel =
+  (typeof RiskPredictionPredictedRiskLevel)[keyof typeof RiskPredictionPredictedRiskLevel];
 
-export const EventWithRiskRiskLevel = {
+export const RiskPredictionPredictedRiskLevel = {
   Low: "Low",
   Medium: "Medium",
   High: "High",

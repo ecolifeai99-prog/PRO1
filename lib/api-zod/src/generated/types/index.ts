@@ -3,15 +3,28 @@
  * Do not edit manually.
  * Api
  * AI-Driven Process Intelligence and Risk Governance Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from "./analyticsSummary";
+export * from "./anomalyResult";
 export * from "./apiError";
 export * from "./createEventInput";
 export * from "./deleteResponse";
+export * from "./eventWithFullAnalysis";
+export * from "./eventWithFullAnalysisRiskLevel";
 export * from "./eventWithRisk";
 export * from "./eventWithRiskRiskLevel";
 export * from "./healthStatus";
+export * from "./mlAlgorithmInfo";
+export * from "./mlModelInfo";
+export * from "./mlModelStats";
 export * from "./processEventCount";
+export * from "./processHealth";
+export * from "./processHealthHealthLabel";
+export * from "./processTrend";
+export * from "./processTrendTrendDirection";
 export * from "./riskDistribution";
+export * from "./riskPrediction";
+export * from "./riskPredictionPredictedRiskLevel";
+export * from "./timeSeriesPoint";

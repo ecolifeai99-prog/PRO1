@@ -5,9 +5,9 @@
  * AI-Driven Process Intelligence and Risk Governance Platform API
  * OpenAPI spec version: 0.2.0
  */
-import type { EventWithRiskRiskLevel } from "./eventWithRiskRiskLevel";
+import type { EventWithFullAnalysisRiskLevel } from "./eventWithFullAnalysisRiskLevel";
 
-export interface EventWithRisk {
+export interface EventWithFullAnalysis {
   id: string;
   process_name: string;
   event_type: string;
@@ -15,6 +15,11 @@ export interface EventWithRisk {
   likelihood: number;
   timestamp: string;
   risk_score: number;
-  risk_level: EventWithRiskRiskLevel;
+  risk_level: EventWithFullAnalysisRiskLevel;
   recommendation: string;
+  weighted_score: number;
+  anomaly_score: number;
+  is_anomaly: boolean;
+  confidence: number;
+  contributing_factors: string[];
 }

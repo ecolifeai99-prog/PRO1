@@ -8,6 +8,7 @@ import Dashboard from "@/pages/Dashboard";
 import AddEvent from "@/pages/AddEvent";
 import RiskAnalysis from "@/pages/RiskAnalysis";
 import Analytics from "@/pages/Analytics";
+import AiEngine from "@/pages/AiEngine";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,7 @@ function Router() {
         <Route path="/add-event" component={AddEvent} />
         <Route path="/risk-analysis" component={RiskAnalysis} />
         <Route path="/analytics" component={Analytics} />
+        <Route path="/ai-engine" component={AiEngine} />
         <Route component={NotFound} />
       </Switch>
     </Shell>

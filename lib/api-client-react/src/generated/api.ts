@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * AI-Driven Process Intelligence and Risk Governance Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
@@ -18,13 +18,20 @@ import type {
 
 import type {
   AnalyticsSummary,
+  AnomalyResult,
   ApiError,
   CreateEventInput,
   DeleteResponse,
+  EventWithFullAnalysis,
   EventWithRisk,
   HealthStatus,
+  MlModelInfo,
+  MlModelStats,
   ProcessEventCount,
+  ProcessHealth,
+  ProcessTrend,
   RiskDistribution,
+  RiskPrediction,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -37,7 +44,6 @@ type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const getHealthCheckUrl = () => {
@@ -113,7 +119,6 @@ export function useHealthCheck<
 }
 
 /**
- * Returns all stored process events with risk analysis
  * @summary Get all events
  */
 export const getGetEventsUrl = () => {
@@ -181,7 +186,6 @@ export function useGetEvents<
 }
 
 /**
- * Add a new process event to in-memory store
  * @summary Submit a new event
  */
 export const getCreateEventUrl = () => {
@@ -191,8 +195,8 @@ export const getCreateEventUrl = () => {
 export const createEvent = async (
   createEventInput: CreateEventInput,
   options?: RequestInit,
-): Promise<EventWithRisk> => {
-  return customFetch<EventWithRisk>(getCreateEventUrl(), {
+): Promise<EventWithFullAnalysis> => {
+  return customFetch<EventWithFullAnalysis>(getCreateEventUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -439,7 +443,6 @@ export const useDeleteEvent = <
 };
 
 /**
- * Returns total counts, risk distribution, and recent activity
  * @summary Dashboard summary statistics
  */
 export const getGetAnalyticsSummaryUrl = () => {
@@ -515,7 +518,6 @@ export function useGetAnalyticsSummary<
 }
 
 /**
- * Returns count of events per risk level for pie chart
  * @summary Risk level distribution
  */
 export const getGetRiskDistributionUrl = () => {
@@ -591,8 +593,7 @@ export function useGetRiskDistribution<
 }
 
 /**
- * Returns event counts per process for bar chart
- * @summary Events grouped by process name
+ * @summary Events grouped by process
  */
 export const getGetEventsPerProcessUrl = () => {
   return `/api/analytics/events-per-process`;
@@ -643,7 +644,7 @@ export type GetEventsPerProcessQueryResult = NonNullable<
 export type GetEventsPerProcessQueryError = ErrorType<unknown>;
 
 /**
- * @summary Events grouped by process name
+ * @summary Events grouped by process
  */
 
 export function useGetEventsPerProcess<
@@ -667,7 +668,6 @@ export function useGetEventsPerProcess<
 }
 
 /**
- * Returns the 5 most recent high-risk events for the activity feed
  * @summary Recent high-risk events
  */
 export const getGetRecentActivityUrl = () => {
@@ -734,6 +734,462 @@ export function useGetRecentActivity<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetRecentActivityQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns metadata about all ML algorithms used in the platform
+ * @summary ML model and algorithm information
+ */
+export const getGetMlModelInfoUrl = () => {
+  return `/api/ml/model-info`;
+};
+
+export const getMlModelInfo = async (
+  options?: RequestInit,
+): Promise<MlModelInfo> => {
+  return customFetch<MlModelInfo>(getGetMlModelInfoUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlModelInfoQueryKey = () => {
+  return [`/api/ml/model-info`] as const;
+};
+
+export const getGetMlModelInfoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlModelInfo>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlModelInfo>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlModelInfoQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMlModelInfo>>> = ({
+    signal,
+  }) => getMlModelInfo({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlModelInfo>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlModelInfoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlModelInfo>>
+>;
+export type GetMlModelInfoQueryError = ErrorType<unknown>;
+
+/**
+ * @summary ML model and algorithm information
+ */
+
+export function useGetMlModelInfo<
+  TData = Awaited<ReturnType<typeof getMlModelInfo>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlModelInfo>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlModelInfoQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns anomaly scores for all events using Z-score statistical analysis
+ * @summary Z-score anomaly detection results
+ */
+export const getGetMlAnomaliesUrl = () => {
+  return `/api/ml/anomalies`;
+};
+
+export const getMlAnomalies = async (
+  options?: RequestInit,
+): Promise<AnomalyResult[]> => {
+  return customFetch<AnomalyResult[]>(getGetMlAnomaliesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlAnomaliesQueryKey = () => {
+  return [`/api/ml/anomalies`] as const;
+};
+
+export const getGetMlAnomaliesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlAnomalies>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlAnomalies>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlAnomaliesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMlAnomalies>>> = ({
+    signal,
+  }) => getMlAnomalies({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlAnomalies>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlAnomaliesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlAnomalies>>
+>;
+export type GetMlAnomaliesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Z-score anomaly detection results
+ */
+
+export function useGetMlAnomalies<
+  TData = Awaited<ReturnType<typeof getMlAnomalies>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlAnomalies>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlAnomaliesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns EMA-based risk trend per process over time
+ * @summary Exponential Moving Average risk trend analysis
+ */
+export const getGetMlTrendsUrl = () => {
+  return `/api/ml/trends`;
+};
+
+export const getMlTrends = async (
+  options?: RequestInit,
+): Promise<ProcessTrend[]> => {
+  return customFetch<ProcessTrend[]>(getGetMlTrendsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlTrendsQueryKey = () => {
+  return [`/api/ml/trends`] as const;
+};
+
+export const getGetMlTrendsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlTrends>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlTrends>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlTrendsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMlTrends>>> = ({
+    signal,
+  }) => getMlTrends({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlTrends>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlTrendsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlTrends>>
+>;
+export type GetMlTrendsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Exponential Moving Average risk trend analysis
+ */
+
+export function useGetMlTrends<
+  TData = Awaited<ReturnType<typeof getMlTrends>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlTrends>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlTrendsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns a weighted health index per process using multi-factor scoring
+ * @summary Composite process health scores
+ */
+export const getGetMlProcessHealthUrl = () => {
+  return `/api/ml/process-health`;
+};
+
+export const getMlProcessHealth = async (
+  options?: RequestInit,
+): Promise<ProcessHealth[]> => {
+  return customFetch<ProcessHealth[]>(getGetMlProcessHealthUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlProcessHealthQueryKey = () => {
+  return [`/api/ml/process-health`] as const;
+};
+
+export const getGetMlProcessHealthQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlProcessHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlProcessHealth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlProcessHealthQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMlProcessHealth>>
+  > = ({ signal }) => getMlProcessHealth({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlProcessHealth>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlProcessHealthQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlProcessHealth>>
+>;
+export type GetMlProcessHealthQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Composite process health scores
+ */
+
+export function useGetMlProcessHealth<
+  TData = Awaited<ReturnType<typeof getMlProcessHealth>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlProcessHealth>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlProcessHealthQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns risk velocity and predicted next risk level per process using linear regression
+ * @summary Risk velocity and next-event predictions
+ */
+export const getGetMlPredictionsUrl = () => {
+  return `/api/ml/predictions`;
+};
+
+export const getMlPredictions = async (
+  options?: RequestInit,
+): Promise<RiskPrediction[]> => {
+  return customFetch<RiskPrediction[]>(getGetMlPredictionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlPredictionsQueryKey = () => {
+  return [`/api/ml/predictions`] as const;
+};
+
+export const getGetMlPredictionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlPredictions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlPredictions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlPredictionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMlPredictions>>
+  > = ({ signal }) => getMlPredictions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlPredictions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlPredictionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlPredictions>>
+>;
+export type GetMlPredictionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Risk velocity and next-event predictions
+ */
+
+export function useGetMlPredictions<
+  TData = Awaited<ReturnType<typeof getMlPredictions>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlPredictions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlPredictionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns aggregate model metrics across all algorithms
+ * @summary Overall ML model performance statistics
+ */
+export const getGetMlModelStatsUrl = () => {
+  return `/api/ml/model-stats`;
+};
+
+export const getMlModelStats = async (
+  options?: RequestInit,
+): Promise<MlModelStats> => {
+  return customFetch<MlModelStats>(getGetMlModelStatsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMlModelStatsQueryKey = () => {
+  return [`/api/ml/model-stats`] as const;
+};
+
+export const getGetMlModelStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMlModelStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlModelStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMlModelStatsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMlModelStats>>> = ({
+    signal,
+  }) => getMlModelStats({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMlModelStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMlModelStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMlModelStats>>
+>;
+export type GetMlModelStatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Overall ML model performance statistics
+ */
+
+export function useGetMlModelStats<
+  TData = Awaited<ReturnType<typeof getMlModelStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMlModelStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMlModelStatsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

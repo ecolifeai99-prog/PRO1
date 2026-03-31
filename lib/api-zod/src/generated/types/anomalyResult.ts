@@ -6,10 +6,13 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface ProcessEventCount {
+export interface AnomalyResult {
+  id: string;
   process_name: string;
-  count: number;
-  high_risk: number;
-  medium_risk: number;
-  low_risk: number;
+  event_type: string;
+  risk_score: number;
+  z_score: number;
+  anomaly_score: number;
+  is_anomaly: boolean;
+  timestamp: string;
 }

@@ -6,7 +6,8 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface DeleteResponse {
-  success: boolean;
-  message: string;
+export interface TimeSeriesPoint {
+  timestamp: string;
+  risk_score: number;
+  ema: number;
 }
