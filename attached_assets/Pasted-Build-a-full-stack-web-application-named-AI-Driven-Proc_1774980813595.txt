@@ -1,0 +1,94 @@
+Build a full-stack web application named "AI-Driven Process Intelligence and Risk Governance Platform" with the following STRICT constraints and features:
+
+⚠️ IMPORTANT CONSTRAINT:
+- DO NOT use any database (No SQLite, No MySQL, No PostgreSQL)
+- Store all data in temporary in-memory storage (Python lists/dictionaries)
+- Data should reset when the server restarts
+
+🧱 TECH STACK:
+- Backend: Python Flask
+- Frontend: HTML, CSS, Vanilla JavaScript
+- Charts: Chart.js
+
+🎯 CORE FEATURES:
+
+1. IN-MEMORY STORAGE:
+- Use a global Python list named `events`
+- Each event should be a dictionary:
+  {
+    id,
+    process_name,
+    event_type,
+    severity,
+    likelihood,
+    timestamp
+  }
+
+2. USER INTERFACE:
+- Dashboard with sidebar:
+  - Dashboard
+  - Add Event
+  - Risk Analysis
+  - Analytics
+- Clean modern UI (cards, tables, responsive)
+
+3. BACKEND (Flask ROUTES):
+- '/' → Dashboard
+- '/add-event' → Form page
+- '/submit-event' → POST request to store event in memory
+- '/risk-analysis' → Display risk results
+- '/api/events' → Return all events as JSON
+
+4. AI RISK LOGIC:
+Implement rule-based scoring:
+
+Risk Score = severity × likelihood
+
+Risk Levels:
+- 1–5 → Low Risk
+- 6–12 → Medium Risk
+- 13–25 → High Risk
+
+Return:
+- risk_score
+- risk_level
+- recommendation
+
+Recommendations:
+- High → "Immediate attention required"
+- Medium → "Monitor closely"
+- Low → "No immediate action needed"
+
+5. DASHBOARD:
+- Total events count
+- Count of High, Medium, Low risks
+- Table of recent events
+
+6. ANALYTICS (Chart.js):
+- Pie chart → Risk distribution
+- Bar chart → Events per process
+
+7. FRONTEND:
+- Use Fetch API for dynamic updates
+- Form validation
+- Responsive design using Flexbox/Grid
+
+8. PROJECT STRUCTURE:
+- app.py
+- templates/
+    - index.html
+    - add_event.html
+    - risk_analysis.html
+    - analytics.html
+- static/
+    - css/
+    - js/
+
+9. CODE REQUIREMENTS:
+- Keep code simple and modular
+- Add comments for explanation (for viva)
+- Clearly separate AI logic into functions
+- Ensure app runs using: python app.py
+
+🎓 NOTE:
+This is a prototype system using temporary memory storage for simplicity. Design it so it can later be extended to use databases or machine learning models.

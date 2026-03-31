@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface ProcessEventCount {
+  process_name: string;
+  count: number;
+  high_risk: number;
+  medium_risk: number;
+  low_risk: number;
 }

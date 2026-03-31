@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AI-Driven Process Intelligence and Risk Governance Platform"
+version = "1.0.0"
+id = "artifacts/risk-platform"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19214
+
+[services.development]
+run = "pnpm --filter @workspace/risk-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/risk-platform", "run", "build" ]
+publicDir = "artifacts/risk-platform/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19214"
+BASE_PATH = "/"

@@ -1,15 +1,18 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AI-Driven Process Intelligence and Risk Governance Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: events
+    description: Process event management
+  - name: analytics
+    description: Analytics and risk summaries
 paths:
   /healthz:
     get:
@@ -24,6 +27,155 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /events:
+    get:
+      operationId: getEvents
+      tags: [events]
+      summary: Get all events
+      description: Returns all stored process events with risk analysis
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventWithRisk"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Submit a new event
+      description: Add a new process event to in-memory store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventInput"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventWithRisk"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /events/{id}:
+    get:
+      operationId: getEventById
+      tags: [events]
+      summary: Get event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event with risk analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventWithRisk"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /analytics/summary:
+    get:
+      operationId: getAnalyticsSummary
+      tags: [analytics]
+      summary: Dashboard summary statistics
+      description: Returns total counts, risk distribution, and recent activity
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSummary"
+
+  /analytics/risk-distribution:
+    get:
+      operationId: getRiskDistribution
+      tags: [analytics]
+      summary: Risk level distribution
+      description: Returns count of events per risk level for pie chart
+      responses:
+        "200":
+          description: Risk distribution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskDistribution"
+
+  /analytics/events-per-process:
+    get:
+      operationId: getEventsPerProcess
+      tags: [analytics]
+      summary: Events grouped by process name
+      description: Returns event counts per process for bar chart
+      responses:
+        "200":
+          description: Events per process
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProcessEventCount"
+
+  /analytics/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [analytics]
+      summary: Recent high-risk events
+      description: Returns the 5 most recent high-risk events for the activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventWithRisk"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +186,134 @@ components:
       required:
         - status
 
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    CreateEventInput:
+      type: object
+      properties:
+        process_name:
+          type: string
+        event_type:
+          type: string
+        severity:
+          type: integer
+          minimum: 1
+          maximum: 5
+        likelihood:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required:
+        - process_name
+        - event_type
+        - severity
+        - likelihood
+
+    EventWithRisk:
+      type: object
+      properties:
+        id:
+          type: string
+        process_name:
+          type: string
+        event_type:
+          type: string
+        severity:
+          type: integer
+        likelihood:
+          type: integer
+        timestamp:
+          type: string
+        risk_score:
+          type: integer
+        risk_level:
+          type: string
+          enum: [Low, Medium, High]
+        recommendation:
+          type: string
+      required:
+        - id
+        - process_name
+        - event_type
+        - severity
+        - likelihood
+        - timestamp
+        - risk_score
+        - risk_level
+        - recommendation
+
+    AnalyticsSummary:
+      type: object
+      properties:
+        total_events:
+          type: integer
+        high_risk_count:
+          type: integer
+        medium_risk_count:
+          type: integer
+        low_risk_count:
+          type: integer
+        avg_risk_score:
+          type: number
+        recent_events:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventWithRisk"
+      required:
+        - total_events
+        - high_risk_count
+        - medium_risk_count
+        - low_risk_count
+        - avg_risk_score
+        - recent_events
+
+    RiskDistribution:
+      type: object
+      properties:
+        high:
+          type: integer
+        medium:
+          type: integer
+        low:
+          type: integer
+      required:
+        - high
+        - medium
+        - low
+
+    ProcessEventCount:
+      type: object
+      properties:
+        process_name:
+          type: string
+        count:
+          type: integer
+        high_risk:
+          type: integer
+        medium_risk:
+          type: integer
+        low_risk:
+          type: integer
+      required:
+        - process_name
+        - count
+        - high_risk
+        - medium_risk
+        - low_risk

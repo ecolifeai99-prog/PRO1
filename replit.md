@@ -1,3 +1,41 @@
+# AI-Driven Process Intelligence and Risk Governance Platform
+
+## Overview
+
+Full-stack web application for tracking process events and assessing AI-driven risk scores. Uses in-memory storage (no database) — data resets on server restart.
+
+## Artifacts
+
+- `artifacts/risk-platform` — React + Vite frontend, preview at `/`
+- `artifacts/api-server` — Express API server, serves at `/api`
+
+## Risk Logic
+
+Risk Score = severity × likelihood
+
+| Score | Level  | Recommendation               |
+|-------|--------|------------------------------|
+| 1–5   | Low    | No immediate action needed   |
+| 6–12  | Medium | Monitor closely              |
+| 13–25 | High   | Immediate attention required |
+
+## API Routes
+
+- `GET /api/events` — All events with risk analysis
+- `POST /api/events` — Create event (body: process_name, event_type, severity, likelihood)
+- `GET /api/events/:id` — Single event
+- `DELETE /api/events/:id` — Delete event
+- `GET /api/analytics/summary` — Dashboard stats
+- `GET /api/analytics/risk-distribution` — Risk level breakdown
+- `GET /api/analytics/events-per-process` — Events per process for bar chart
+- `GET /api/analytics/recent-activity` — Recent high-risk events
+
+## In-Memory Store
+
+`artifacts/api-server/src/store.ts` — global `events` array with `computeRisk()` AI logic. Seeded with 10 sample events.
+
+---
+
 # Workspace
 
 ## Overview
