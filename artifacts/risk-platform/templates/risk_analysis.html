@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight">Risk Log &amp; Analysis</h1>
+    <p class="text-slate-500 mt-1">Complete historical record of all assessed process events.</p>
+  </div>
+
+  <!-- Filters -->
+  <div class="card p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex gap-1 bg-slate-100 p-1 rounded-lg" id="filter-tabs">
+      <button class="tab-btn active" data-filter="All" onclick="setFilter(this,'All')">All</button>
+      <button class="tab-btn" data-filter="High" onclick="setFilter(this,'High')" style="color:#dc2626">High</button>
+      <button class="tab-btn" data-filter="Medium" onclick="setFilter(this,'Medium')" style="color:#d97706">Medium</button>
+      <button class="tab-btn" data-filter="Low" onclick="setFilter(this,'Low')" style="color:#059669">Low</button>
+    </div>
+    <div class="relative w-full sm:w-80">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+      <input id="search" type="text" placeholder="Search processes or event types..." class="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" oninput="renderEvents()" />
+    </div>
+  </div>
+
+  <!-- Events list -->
+  <div id="events-list" class="space-y-3">
+    <div class="text-center py-10 text-slate-400">Loading...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allEvents = [];
+let currentFilter = 'All';
+
+async function loadEvents() {
+  const res = await fetch('/api/events');
+  allEvents = await res.json();
+  renderEvents();
+}
+
+function setFilter(btn, filter) {
+  currentFilter = filter;
+  document.querySelectorAll('#filter-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEvents();
+}
+
+function renderEvents() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const filtered = allEvents.filter(e => {
+    if (currentFilter !== 'All' && e.risk_level !== currentFilter) return false;
+    if (search && !e.process_name.toLowerCase().includes(search) && !e.event_type.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const container = document.getElementById('events-list');
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="card border-dashed bg-transparent shadow-none">
+        <div class="flex flex-col items-center justify-center py-16 text-slate-400">
+          <div class="bg-slate-100 p-4 rounded-full mb-4">
+            <svg class="w-8 h-8 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <p class="font-medium text-slate-700">No events found</p>
+          <p class="text-sm mt-1">Try adjusting your search or filters.</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const borderColor = { High:'#ef4444', Medium:'#f59e0b', Low:'#10b981' };
+  container.innerHTML = filtered.map(e => `
+    <div class="card overflow-hidden border-l-4" style="border-left-color:${borderColor[e.risk_level] || '#94a3b8'}">
+      <div class="p-5 flex flex-col md:flex-row md:items-stretch gap-5">
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2 mb-2">
+            <h3 class="font-bold text-lg text-slate-800">${e.process_name}</h3>
+            ${riskBadge(e.risk_level)}
+            <span class="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-400">ID: ${e.id.slice(0,8)}</span>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-500">
+            <span class="font-medium text-slate-700">${e.event_type}</span>
+            <span>Sev: <strong class="text-slate-800">${e.severity}</strong></span>
+            <span>Likelihood: <strong class="text-slate-800">${e.likelihood}</strong></span>
+            <span>${timeAgo(e.timestamp)}</span>
+          </div>
+        </div>
+        <div class="flex md:flex-col items-center justify-between md:justify-center gap-4 md:border-l md:pl-5">
+          <div class="text-center">
+            <div class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Risk Score</div>
+            <div class="text-4xl font-black font-mono leading-none">${e.risk_score}</div>
+          </div>
+          <button onclick="deleteEvent('${e.id}', this)" class="text-slate-400 hover:text-red-600 hover:bg-red-50 text-xs font-medium py-1.5 px-3 rounded-lg border border-slate-200 hover:border-red-200 transition-colors flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Delete
+          </button>
+        </div>
+      </div>
+      <div class="bg-slate-50 px-5 py-3 border-t flex items-start gap-3">
+        <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <div>
+          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Recommendation</span>
+          <p class="text-sm font-medium text-slate-800">${e.recommendation}</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteEvent(id, btn) {
+  if (!confirm('Delete this event?')) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/events/' + id, {method:'DELETE'});
+    if (!res.ok) throw new Error('Delete failed');
+    allEvents = allEvents.filter(e => e.id !== id);
+    renderEvents();
+    showToast('Event removed successfully.');
+  } catch(e) {
+    showToast('Failed to delete event.', 'error');
+    btn.disabled = false;
+  }
+}
+
+loadEvents();
+</script>
+{% endblock %}

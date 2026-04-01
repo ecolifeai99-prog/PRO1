@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto pb-12">
+  <div class="border-b pb-6">
+    <h1 class="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
+      <div class="bg-blue-50 p-2 rounded-lg text-blue-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg>
+      </div>
+      Intelligence Engine
+    </h1>
+    <p class="text-slate-500 text-lg">Real-time machine learning analysis of process stability, risk anomalies, and predictive trends.</p>
+  </div>
+
+  <!-- Model Stats -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="model-stats">
+    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Events Analyzed</div><div class="text-2xl font-black font-mono" id="ms-events">—</div></div>
+    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Anomalies</div><div class="text-2xl font-black font-mono" id="ms-anomalies">—</div></div>
+    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Anomaly Rate</div><div class="text-2xl font-black font-mono" id="ms-anomaly-rate">—</div></div>
+    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Model Accuracy</div><div class="text-2xl font-black font-mono" id="ms-accuracy">—</div></div>
+    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">F1 Score</div><div class="text-2xl font-black font-mono" id="ms-f1">—</div></div>
+  </div>
+
+  <!-- Algorithm Cards -->
+  <div>
+    <div class="flex items-center gap-2 mb-4">
+      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg>
+      <h2 class="text-xl font-bold">Intelligence Models</h2>
+      <span id="model-version" class="ml-2 text-xs font-mono bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full text-slate-500"></span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="algo-cards">
+      <div class="text-slate-400 text-sm col-span-3 py-6 text-center">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Anomaly Detection + Health Index -->
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+    <!-- Anomaly Table -->
+    <div class="card flex flex-col">
+      <div class="px-5 py-5 border-b">
+        <h2 class="font-bold text-lg flex items-center gap-2">
+          <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Z-Score Anomaly Detection
+        </h2>
+        <p class="text-sm text-slate-500 mt-0.5">Events exhibiting abnormal statistical deviations</p>
+      </div>
+      <div class="overflow-x-auto flex-1">
+        <table class="w-full text-xs">
+          <thead class="bg-slate-50 border-b">
+            <tr>
+              <th class="px-4 py-3 font-semibold text-left text-slate-500">Process</th>
+              <th class="px-4 py-3 font-semibold text-left text-slate-500">Event</th>
+              <th class="px-4 py-3 font-semibold text-right text-slate-500">Risk</th>
+              <th class="px-4 py-3 font-semibold text-right text-slate-500">Z-Score</th>
+              <th class="px-4 py-3 font-semibold text-slate-500">Anomaly %</th>
+              <th class="px-4 py-3 font-semibold text-right text-slate-500">Status</th>
+            </tr>
+          </thead>
+          <tbody id="anomaly-tbody" class="divide-y divide-slate-50">
+            <tr><td colspan="6" class="text-center py-8 text-slate-400">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Process Health Index -->
+    <div class="card flex flex-col">
+      <div class="px-5 py-5 border-b">
+        <h2 class="font-bold text-lg flex items-center gap-2">
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          Process Health Index
+        </h2>
+        <p class="text-sm text-slate-500 mt-0.5">Holistic health scoring based on severity, frequency, and recency</p>
+      </div>
+      <div class="p-5 space-y-5 flex-1" id="health-list">
+        <div class="text-slate-400 text-sm text-center py-6">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMA Trend Analysis -->
+  <div class="card">
+    <div class="px-5 py-5 border-b">
+      <h2 class="font-bold text-lg flex items-center gap-2">
+        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        EMA Trend Analysis
+      </h2>
+      <p class="text-sm text-slate-500 mt-0.5">Exponential Moving Average tracking across processes</p>
+    </div>
+    <div id="trend-accordion" class="divide-y border-t"></div>
+  </div>
+
+  <!-- Predictions Table -->
+  <div class="card">
+    <div class="px-5 py-5 border-b">
+      <h2 class="font-bold text-lg flex items-center gap-2">
+        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"/></svg>
+        Linear Regression Predictions
+      </h2>
+      <p class="text-sm text-slate-500 mt-0.5">Forecasted risk levels based on historical data patterns</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b">
+          <tr>
+            <th class="px-5 py-3 font-semibold text-left text-slate-500">Process</th>
+            <th class="px-5 py-3 font-semibold text-left text-slate-500">Risk Velocity</th>
+            <th class="px-5 py-3 font-semibold text-right text-slate-500">Predicted Score</th>
+            <th class="px-5 py-3 font-semibold text-center text-slate-500">Forecast Level</th>
+            <th class="px-5 py-3 font-semibold text-center text-slate-500">95% CI</th>
+            <th class="px-5 py-3 font-semibold text-right text-slate-500">Training Points</th>
+          </tr>
+        </thead>
+        <tbody id="pred-tbody" class="divide-y">
+          <tr><td colspan="6" class="text-center py-8 text-slate-400">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const HEALTH_COLORS = {
+  Critical: { bg: 'bg-red-600', text: 'text-white', bar: '#dc2626' },
+  Poor: { bg: 'bg-orange-500', text: 'text-white', bar: '#f97316' },
+  Fair: { bg: 'bg-yellow-500', text: 'text-white', bar: '#eab308' },
+  Good: { bg: 'bg-teal-500', text: 'text-white', bar: '#14b8a6' },
+  Excellent: { bg: 'bg-green-500', text: 'text-white', bar: '#22c55e' },
+};
+
+function trendIcon(dir) {
+  if (dir === 'rising') return '<svg class="w-4 h-4 text-red-500 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>';
+  if (dir === 'falling') return '<svg class="w-4 h-4 text-green-500 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>';
+  return '<svg class="w-4 h-4 text-slate-400 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14"/></svg>';
+}
+
+function velocityColor(v) {
+  if (v > 0.1) return 'text-red-600';
+  if (v < -0.1) return 'text-green-600';
+  return 'text-slate-400';
+}
+
+async function loadAll() {
+  const [statsR, infoR, anomR, trendR, healthR, predR] = await Promise.all([
+    fetch('/api/ml/model-stats'),
+    fetch('/api/ml/model-info'),
+    fetch('/api/ml/anomalies'),
+    fetch('/api/ml/trends'),
+    fetch('/api/ml/process-health'),
+    fetch('/api/ml/predictions'),
+  ]);
+  const [stats, info, anomalies, trends, health, predictions] = await Promise.all([
+    statsR.json(), infoR.json(), anomR.json(), trendR.json(), healthR.json(), predR.json()
+  ]);
+
+  // Stats
+  document.getElementById('ms-events').textContent = stats.total_events_analyzed.toLocaleString();
+  document.getElementById('ms-anomalies').textContent = stats.anomalies_detected.toLocaleString();
+  document.getElementById('ms-anomaly-rate').textContent = (stats.anomaly_rate * 100).toFixed(1) + '%';
+  document.getElementById('ms-accuracy').textContent = (stats.model_accuracy * 100).toFixed(1) + '%';
+  document.getElementById('ms-f1').textContent = stats.f1_score.toFixed(3);
+
+  // Model info
+  document.getElementById('model-version').textContent = 'v' + info.model_version;
+  document.getElementById('algo-cards').innerHTML = info.algorithms.map(a => `
+    <div class="card flex flex-col hover:border-blue-300 transition-colors">
+      <div class="px-5 py-4 border-b">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="font-bold leading-tight">${a.name}</h3>
+          <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border font-medium whitespace-nowrap ml-2">${a.type}</span>
+        </div>
+        <p class="text-sm text-slate-500 line-clamp-2">${a.description}</p>
+      </div>
+      <div class="p-5 flex-1 space-y-4">
+        <div class="bg-slate-50 rounded-lg p-3 font-mono text-xs text-slate-700 overflow-x-auto border">${a.formula}</div>
+        <div class="text-sm">
+          <span class="font-semibold text-slate-700 block mb-1">Primary Use Case:</span>
+          <span class="text-slate-500">${a.use_case}</span>
+        </div>
+        <div class="mt-auto pt-4 border-t">
+          <div class="flex justify-between text-xs font-medium mb-1.5">
+            <span class="text-slate-400">Confidence Score</span>
+            <span class="font-mono">${(a.accuracy * 100).toFixed(1)}%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill bg-blue-500" style="width:${a.accuracy*100}%"></div></div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Anomalies
+  document.getElementById('anomaly-tbody').innerHTML = anomalies.map(a => `
+    <tr class="${a.is_anomaly ? 'bg-red-50/50' : ''}">
+      <td class="px-4 py-2.5 font-medium">${a.process_name}</td>
+      <td class="px-4 py-2.5 text-slate-500">${a.event_type}</td>
+      <td class="px-4 py-2.5 text-right font-mono">${a.risk_score}</td>
+      <td class="px-4 py-2.5 text-right font-mono text-slate-400">${a.z_score.toFixed(2)}</td>
+      <td class="px-4 py-2.5">
+        <div class="flex items-center gap-2">
+          <div class="progress-bar w-14"><div class="progress-fill ${a.is_anomaly ? 'bg-red-500' : 'bg-blue-500'}" style="width:${a.anomaly_score*100}%"></div></div>
+          <span class="font-mono">${(a.anomaly_score*100).toFixed(0)}%</span>
+        </div>
+      </td>
+      <td class="px-4 py-2.5 text-right">
+        ${a.is_anomaly
+          ? '<span class="badge-high px-2 py-0.5 rounded-full text-xs font-semibold">Anomaly</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">Normal</span>'}
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" class="text-center py-8 text-slate-400">No anomalies detected</td></tr>';
+
+  // Health
+  document.getElementById('health-list').innerHTML = health.map(h => {
+    const c = HEALTH_COLORS[h.health_label] || HEALTH_COLORS.Fair;
+    return `
+      <div class="space-y-2">
+        <div class="flex justify-between items-center">
+          <span class="font-semibold text-slate-800">${h.process_name}</span>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-full ${c.bg} ${c.text}">${h.health_label}</span>
+        </div>
+        <div class="progress-bar h-2.5"><div class="progress-fill" style="width:${h.health_score}%;background:${c.bar}"></div></div>
+        <div class="grid grid-cols-4 gap-2 text-xs text-center border-t pt-2">
+          <div><div class="text-slate-400 mb-1">Score</div><div class="font-mono font-medium">${h.health_score}</div></div>
+          <div><div class="text-slate-400 mb-1">Events</div><div class="font-mono font-medium">${h.event_count}</div></div>
+          <div><div class="text-slate-400 mb-1">Avg Sev</div><div class="font-mono font-medium">${h.avg_severity.toFixed(1)}</div></div>
+          <div><div class="text-slate-400 mb-1">High Risk</div><div class="font-mono font-medium">${(h.high_risk_ratio*100).toFixed(0)}%</div></div>
+        </div>
+      </div>`;
+  }).join('<div class="border-t my-1"></div>');
+
+  // Trends accordion
+  const trendContainer = document.getElementById('trend-accordion');
+  trendContainer.innerHTML = trends.map((t, i) => {
+    const dir = t.trend_direction;
+    const dirColor = dir === 'rising' ? 'text-red-600' : dir === 'falling' ? 'text-green-600' : 'text-slate-400';
+    const canvasId = `trend-chart-${i}`;
+    return `
+      <div class="border-b last:border-b-0">
+        <button onclick="toggleAccordion(${i})" class="w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span class="font-semibold">${t.process_name}</span>
+          <div class="flex items-center gap-4 text-sm bg-white px-3 py-1.5 rounded-full border shadow-sm">
+            <span class="text-slate-400">EMA: <span class="font-mono text-slate-700 font-medium">${t.ema_current.toFixed(2)}</span></span>
+            <div class="w-px h-4 bg-slate-200"></div>
+            <div class="flex items-center gap-1.5 w-20">
+              ${trendIcon(dir)}
+              <span class="font-medium capitalize ${dirColor}">${dir}</span>
+            </div>
+            <div class="w-px h-4 bg-slate-200"></div>
+            <span class="font-mono text-slate-400">${(t.trend_strength*100).toFixed(0)}%</span>
+          </div>
+        </button>
+        <div id="acc-${i}" class="accordion-body">
+          <div class="px-5 pb-5 pt-2">
+            <div class="bg-slate-50 rounded-xl border p-4 h-64">
+              <canvas id="${canvasId}"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Store trend data for charts
+  window._trends = trends;
+}
+
+function toggleAccordion(i) {
+  const body = document.getElementById(`acc-${i}`);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open');
+  if (!isOpen && window._trends && !body._chartDone) {
+    body._chartDone = true;
+    const t = window._trends[i];
+    const ctx = document.getElementById(`trend-chart-${i}`).getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: t.time_series.map(p => new Date(p.timestamp).toLocaleDateString()),
+        datasets: [
+          {
+            label: 'Risk Score',
+            data: t.time_series.map(p => p.risk_score),
+            borderColor: '#94a3b8',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            pointRadius: 3,
+            tension: 0,
+            fill: false,
+          },
+          {
+            label: 'EMA Trend',
+            data: t.time_series.map(p => p.ema),
+            borderColor: '#2563eb',
+            backgroundColor: 'transparent',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            tension: 0.4,
+            fill: false,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { font: { size: 10 }, maxRotation: 30 }, grid: { display: false } },
+          y: { ticks: { font: { size: 11 } }, grid: { color: '#f1f5f9' } }
+        }
+      }
+    });
+  }
+}
+
+// Predictions
+async function loadPredictions() {}
+
+async function renderPredictions(predictions) {
+  document.getElementById('pred-tbody').innerHTML = predictions.map(p => {
+    const vc = velocityColor(p.risk_velocity);
+    const vIcon = p.risk_velocity > 0.1 ? trendIcon('rising') : p.risk_velocity < -0.1 ? trendIcon('falling') : trendIcon('stable');
+    return `
+      <tr>
+        <td class="px-5 py-3 font-medium">${p.process_name}</td>
+        <td class="px-5 py-3">
+          <div class="flex items-center gap-1.5">
+            ${vIcon}
+            <span class="font-mono text-xs ${vc}">${p.risk_velocity > 0 ? '+' : ''}${p.risk_velocity.toFixed(3)} / day</span>
+          </div>
+        </td>
+        <td class="px-5 py-3 text-right font-mono font-bold text-base">${p.predicted_risk_score.toFixed(1)}</td>
+        <td class="px-5 py-3 text-center">${riskBadge(p.predicted_risk_level)}</td>
+        <td class="px-5 py-3 text-center font-mono text-xs bg-slate-50 text-slate-500">[${p.confidence_interval_low.toFixed(1)} — ${p.confidence_interval_high.toFixed(1)}]</td>
+        <td class="px-5 py-3 text-right font-mono text-slate-400">${p.data_points}</td>
+      </tr>`;
+  }).join('');
+}
+
+loadAll().then(async () => {
+  const predRes = await fetch('/api/ml/predictions');
+  const predictions = await predRes.json();
+  renderPredictions(predictions);
+});
+</script>
+{% endblock %}

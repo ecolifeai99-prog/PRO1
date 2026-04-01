@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Process Intelligence & Risk Governance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .badge-high { background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5; }
+    .badge-medium { background:#fef3c7;color:#92400e;border:1px solid #fcd34d; }
+    .badge-low { background:#d1fae5;color:#065f46;border:1px solid #6ee7b7; }
+    .bar-high { background:#ef4444; }
+    .bar-medium { background:#f59e0b; }
+    .bar-low { background:#10b981; }
+    .nav-link { display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#64748b;transition:all .15s; }
+    .nav-link:hover { background:#f1f5f9;color:#1e293b; }
+    .nav-link.active { background:#eff6ff;color:#1d4ed8; }
+    .nav-icon { width:18px;height:18px;flex-shrink:0; }
+    .card { background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06); }
+    .stat-card { border-left:4px solid #e2e8f0; }
+    .toast { position:fixed;bottom:24px;right:24px;z-index:9999;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.15);transition:opacity .3s; }
+    .toast-success { background:#dcfce7;color:#15803d;border:1px solid #86efac; }
+    .toast-error { background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5; }
+    .slider-wrap { position:relative;padding:4px 0; }
+    input[type=range] { -webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:#e2e8f0;outline:none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#1d4ed8;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 2px #bfdbfe; }
+    .progress-bar { height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden; }
+    .progress-fill { height:100%;border-radius:4px;transition:width .5s; }
+    .accordion-body { display:none; }
+    .accordion-body.open { display:block; }
+    .tab-btn { padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:transparent;color:#64748b;transition:all .15s; }
+    .tab-btn.active { background:#fff;color:#1e293b;box-shadow:0 1px 3px rgba(0,0,0,.1); }
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation:fadeInUp .3s ease; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+<!-- Sidebar -->
+<div class="fixed inset-y-0 left-0 w-60 bg-white border-r border-slate-200 flex flex-col z-50">
+  <div class="px-5 py-5 border-b border-slate-100">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm">AI</div>
+      <div>
+        <div class="text-sm font-bold text-slate-800 leading-tight">Risk Intelligence</div>
+        <div class="text-xs text-slate-400">Governance Platform</div>
+      </div>
+    </div>
+  </div>
+  <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <a href="/dashboard" class="nav-link {% if active == 'dashboard' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
+      Command Center
+    </a>
+    <a href="/add-event" class="nav-link {% if active == 'add_event' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Record Event
+    </a>
+    <a href="/risk-analysis" class="nav-link {% if active == 'risk_analysis' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Risk Log
+    </a>
+    <a href="/analytics" class="nav-link {% if active == 'analytics' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Analytics
+    </a>
+    <a href="/ai-engine" class="nav-link {% if active == 'ai_engine' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg>
+      Intelligence Engine
+    </a>
+  </nav>
+  <div class="px-4 py-3 border-t border-slate-100 text-xs text-slate-400">v2.1.0 &mdash; Flask Edition</div>
+</div>
+
+<!-- Main content -->
+<div class="ml-60 min-h-screen flex flex-col">
+  <main class="flex-1 p-8 max-w-7xl mx-auto w-full">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; setTimeout(()=>t.remove(), 300); }, 3000);
+}
+
+function riskBadge(level) {
+  const cls = level === 'High' ? 'badge-high' : level === 'Medium' ? 'badge-medium' : 'badge-low';
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cls}">${level}</span>`;
+}
+
+function timeAgo(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString();
+}
+
+function shortTime(iso) {
+  return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6 max-w-5xl mx-auto">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight">Record Process Event</h1>
+    <p class="text-slate-500 mt-1">Log a failure, delay, or risk indicator to trigger analysis.</p>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+    <!-- Form -->
+    <div class="card border-t-4 border-t-blue-600">
+      <div class="px-6 py-5 border-b border-slate-100">
+        <h2 class="font-bold text-lg">Event Details</h2>
+        <p class="text-sm text-slate-500 mt-0.5">Enter the specifics of the process interruption.</p>
+      </div>
+      <div class="p-6 space-y-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Process Name</label>
+          <input id="process-name" type="text" placeholder="e.g. Account Onboarding" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" />
+          <p id="err-process" class="text-red-500 text-xs mt-1 hidden"></p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event Type</label>
+          <input id="event-type" type="text" placeholder="e.g. API Timeout, Data Validation Error" class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" />
+          <p id="err-event" class="text-red-500 text-xs mt-1 hidden"></p>
+        </div>
+        <div>
+          <div class="flex justify-between items-center pb-2 border-b border-slate-100 mb-4">
+            <label class="text-sm font-semibold text-slate-700">Severity Impact</label>
+            <span id="sev-val" class="font-bold text-lg text-blue-600 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-center">3</span>
+          </div>
+          <input id="severity" type="range" min="1" max="5" step="1" value="3" class="w-full" oninput="document.getElementById('sev-val').textContent=this.value" />
+          <div class="flex justify-between text-xs text-slate-400 mt-2"><span>1: Negligible</span><span>5: Critical failure</span></div>
+        </div>
+        <div>
+          <div class="flex justify-between items-center pb-2 border-b border-slate-100 mb-4">
+            <label class="text-sm font-semibold text-slate-700">Likelihood of Recurrence</label>
+            <span id="lik-val" class="font-bold text-lg text-blue-600 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-center">3</span>
+          </div>
+          <input id="likelihood" type="range" min="1" max="5" step="1" value="3" class="w-full" oninput="document.getElementById('lik-val').textContent=this.value" />
+          <div class="flex justify-between text-xs text-slate-400 mt-2"><span>1: Very rare</span><span>5: Highly probable</span></div>
+        </div>
+        <button id="submit-btn" onclick="submitEvent()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg text-sm transition-colors">
+          Submit Event &amp; Analyze
+        </button>
+      </div>
+    </div>
+
+    <!-- Result Panel -->
+    <div id="result-placeholder" class="card h-full border-dashed border-2 border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center p-10 min-h-[400px] shadow-none">
+      <div class="bg-slate-100 p-4 rounded-full mb-5">
+        <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4m0 4h.01"/></svg>
+      </div>
+      <h3 class="font-semibold text-lg text-slate-700 mb-2">Awaiting Input</h3>
+      <p class="text-slate-400 max-w-xs text-sm">Submit an event to view automated risk analysis, scoring, and remediation recommendations.</p>
+    </div>
+
+    <div id="result-panel" class="card border-blue-100 bg-blue-50/20 fade-in hidden">
+      <div class="px-6 py-5 border-b border-slate-100 bg-white rounded-t-xl">
+        <h2 class="font-bold text-lg text-blue-700 flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Analysis Complete
+        </h2>
+        <p class="text-sm text-slate-500 mt-0.5">Risk intelligence engine has processed the event.</p>
+      </div>
+      <div class="p-6 space-y-5">
+        <div id="anomaly-banner" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-red-700">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01"/></svg>
+          <span class="font-semibold">Anomaly Detected</span>
+          <span id="anomaly-score-text" class="text-sm ml-auto opacity-75"></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white p-4 rounded-xl border shadow-sm text-center">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Base Score</div>
+            <div class="flex items-baseline justify-center gap-1">
+              <span id="r-risk-score" class="text-3xl font-black font-mono">—</span>
+              <span class="text-xs text-slate-400">/ 25</span>
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border shadow-sm text-center">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Weighted Score</div>
+            <span id="r-weighted-score" class="text-3xl font-black font-mono text-blue-600">—</span>
+          </div>
+          <div class="bg-white p-4 rounded-xl border shadow-sm text-center">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Confidence</div>
+            <span id="r-confidence" class="text-3xl font-black font-mono">—</span>
+          </div>
+          <div class="bg-white p-4 rounded-xl border shadow-sm text-center">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Classification</div>
+            <div id="r-risk-badge" class="flex justify-center mt-1">—</div>
+          </div>
+        </div>
+
+        <div class="bg-white border-l-4 border-l-blue-600 p-4 rounded-r-xl shadow-sm">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            Required Action
+          </h4>
+          <p id="r-recommendation" class="font-medium text-slate-800">—</p>
+        </div>
+
+        <div id="r-factors-section" class="hidden">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Contributing Factors</h4>
+          <ul id="r-factors" class="list-disc pl-5 space-y-1 text-sm text-slate-700"></ul>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-slate-100 bg-white rounded-b-xl">
+        <button onclick="resetForm()" class="w-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-4 rounded-lg text-sm transition-colors">
+          Log Another Event
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function submitEvent() {
+  const processName = document.getElementById('process-name').value.trim();
+  const eventType = document.getElementById('event-type').value.trim();
+  const severity = parseInt(document.getElementById('severity').value);
+  const likelihood = parseInt(document.getElementById('likelihood').value);
+
+  let valid = true;
+  ['err-process','err-event'].forEach(id => { document.getElementById(id).classList.add('hidden'); });
+
+  if (processName.length < 2) {
+    document.getElementById('err-process').textContent = 'Process name must be at least 2 characters.';
+    document.getElementById('err-process').classList.remove('hidden');
+    valid = false;
+  }
+  if (eventType.length < 2) {
+    document.getElementById('err-event').textContent = 'Event type must be at least 2 characters.';
+    document.getElementById('err-event').classList.remove('hidden');
+    valid = false;
+  }
+  if (!valid) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = 'Analyzing...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({process_name: processName, event_type: eventType, severity, likelihood}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Unknown error');
+
+    document.getElementById('result-placeholder').classList.add('hidden');
+    const panel = document.getElementById('result-panel');
+    panel.classList.remove('hidden');
+
+    document.getElementById('r-risk-score').textContent = data.risk_score;
+    document.getElementById('r-weighted-score').textContent = data.weighted_score.toFixed(1);
+    document.getElementById('r-confidence').textContent = (data.confidence * 100).toFixed(0) + '%';
+    document.getElementById('r-risk-badge').innerHTML = riskBadge(data.risk_level);
+    document.getElementById('r-recommendation').textContent = data.recommendation;
+
+    if (data.is_anomaly) {
+      document.getElementById('anomaly-banner').classList.remove('hidden');
+      document.getElementById('anomaly-score-text').textContent = 'Score: ' + (data.anomaly_score * 100).toFixed(0) + '%';
+    } else {
+      document.getElementById('anomaly-banner').classList.add('hidden');
+    }
+
+    if (data.contributing_factors && data.contributing_factors.length) {
+      document.getElementById('r-factors-section').classList.remove('hidden');
+      document.getElementById('r-factors').innerHTML = data.contributing_factors.map(f => `<li>${f}</li>`).join('');
+    }
+
+    showToast('Event logged successfully. Risk score calculated.');
+  } catch(e) {
+    showToast('Submission failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = 'Submit Event & Analyze';
+    btn.disabled = false;
+  }
+}
+
+function resetForm() {
+  document.getElementById('process-name').value = '';
+  document.getElementById('event-type').value = '';
+  document.getElementById('severity').value = 3;
+  document.getElementById('likelihood').value = 3;
+  document.getElementById('sev-val').textContent = '3';
+  document.getElementById('lik-val').textContent = '3';
+  document.getElementById('result-panel').classList.add('hidden');
+  document.getElementById('result-placeholder').classList.remove('hidden');
+}
+</script>
+{% endblock %}
