@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6 max-w-6xl mx-auto">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight">Reports</h1>
+    <p class="text-slate-500 mt-1">Export risk event history and summaries for compliance or audit review.</p>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="card p-6">
+      <h2 class="font-bold text-lg">Download Report</h2>
+      <p class="text-sm text-slate-500 mt-2">Get a CSV snapshot of all captured events with risk scores and recommendations.</p>
+      <a href="/reports/download" class="inline-flex items-center justify-center mt-5 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Download CSV</a>
+    </div>
+    <div class="card p-6 bg-slate-50">
+      <h2 class="font-bold text-lg">Report Notes</h2>
+      <ul class="mt-4 space-y-3 text-sm text-slate-600">
+        <li>Includes risk score, risk level, recommendation, confidence, and source.</li>
+        <li>CSV exports are compatible with Excel, Google Sheets, and BI tools.</li>
+        <li>Use this report for governance reviews and board-level summaries.</li>
+      </ul>
+    </div>
+    <div class="card p-6">
+      <h2 class="font-bold text-lg">Quick Metrics</h2>
+      <div class="mt-4 space-y-4 text-sm text-slate-700">
+        <div class="flex justify-between"><span>Total events</span><span id="report-total">—</span></div>
+        <div class="flex justify-between"><span>High risk</span><span id="report-high">—</span></div>
+        <div class="flex justify-between"><span>Medium risk</span><span id="report-medium">—</span></div>
+        <div class="flex justify-between"><span>Low risk</span><span id="report-low">—</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadReportSummary() {
+  const res = await fetch('/api/analytics/summary');
+  const summary = await res.json();
+  document.getElementById('report-total').textContent = summary.total_events;
+  document.getElementById('report-high').textContent = summary.high_risk_count;
+  document.getElementById('report-medium').textContent = summary.medium_risk_count;
+  document.getElementById('report-low').textContent = summary.low_risk_count;
+}
+loadReportSummary();
+</script>
+{% endblock %}

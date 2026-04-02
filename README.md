@@ -46,6 +46,12 @@ python app.py
 The app will start on port **5000** by default.  
 Open your browser at: [http://localhost:5000](http://localhost:5000)
 
+The system now includes login access control and report export support.
+
+Default accounts:
+- admin / Admin123!
+- user / User123!
+
 To use a different port:
 
 ```bash
@@ -57,6 +63,12 @@ PORT=8080 python app.py
 ## Storage
 
 All event data is stored **in memory only**. There is no database, no file writes, and no external dependencies. Data resets every time the server restarts. This is intentional — the application is designed to be fully self-contained and stateless between sessions.
+
+## Real-Time Automation
+
+- The app now exposes a server-sent events stream at `/stream` for live dashboard and analytics updates.
+- New events are pushed instantly to connected browser clients.
+- A background automation worker generates synthetic risk events periodically so the dashboard stays active and the intelligence engine can demonstrate continuous change.
 
 The in-memory store is seeded with 36 sample events across 8 processes on startup, so the dashboard and analytics pages are populated immediately.
 
@@ -71,6 +83,8 @@ The in-memory store is seeded with 36 sample events across 8 processes on startu
 | `/risk-analysis` | Full event log with filter, search, and delete |
 | `/analytics` | Risk distribution chart and events-per-process bar chart |
 | `/ai-engine` | ML model stats, anomaly detection, EMA trends, health index, predictions |
+| `/alerts` | Active high-risk alert feed |
+| `/reports` | CSV report export and risk summary |
 
 ---
 

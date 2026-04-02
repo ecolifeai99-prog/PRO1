@@ -341,5 +341,14 @@ loadAll().then(async () => {
   const predictions = await predRes.json();
   renderPredictions(predictions);
 });
+
+window.addEventListener('sse:update', async event => {
+  if (event.detail && event.detail.action === 'reload') {
+    await loadAll();
+    const predRes = await fetch('/api/ml/predictions');
+    const predictions = await predRes.json();
+    renderPredictions(predictions);
+  }
+});
 </script>
 {% endblock %}

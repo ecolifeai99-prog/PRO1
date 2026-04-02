@@ -111,5 +111,11 @@ async function loadAnalytics() {
 }
 
 loadAnalytics();
+
+window.addEventListener('sse:update', event => {
+  if (event.detail && event.detail.action === 'reload') {
+    loadAnalytics();
+  }
+});
 </script>
 {% endblock %}

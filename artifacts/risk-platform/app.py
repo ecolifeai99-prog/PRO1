@@ -1,15 +1,129 @@
 import os
+import json
 import math
+import random
+import queue
+import threading
+import time
 import uuid
+import logging
+import csv
+import io
 from datetime import datetime, timezone
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, Response, render_template, request, jsonify, redirect, url_for, stream_with_context, session
+from werkzeug.security import check_password_hash, generate_password_hash
 
+logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-please-change')
+
+users = {
+    'admin': {
+        'username': 'admin',
+        'password_hash': generate_password_hash('Admin123!'),
+        'role': 'admin',
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    },
+    'user': {
+        'username': 'user',
+        'password_hash': generate_password_hash('User123!'),
+        'role': 'user',
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    },
+}
+
+alerts = []
+
+
+def get_current_user():
+    username = session.get('user')
+    return users.get(username)
+
+
+@app.context_processor
+def inject_user():
+    return {'current_user': get_current_user()}
+
+
+def create_alert(event):
+    alerts.append({
+        'id': str(uuid.uuid4()),
+        'event_id': event['id'],
+        'process_name': event['process_name'],
+        'severity': event['risk_score'],
+        'message': f"High risk event: {event['event_type']}",
+        'status': 'Open',
+        'created_at': datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.before_request
+def ensure_logged_in():
+    allowed = {'login', 'static'}
+    if request.endpoint in allowed:
+        return
+    if session.get('user') is None:
+        return redirect(url_for('login'))
 
 # ---------------------------------------------------------------------------
 # In-memory store (resets on restart by design)
 # ---------------------------------------------------------------------------
 events = []
+clients = []
+automation_enabled = True
+
+
+def send_sse_packet(payload):
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def register_client():
+    q = queue.Queue()
+    clients.append(q)
+    return q
+
+
+def notify_clients(payload):
+    for q in list(clients):
+        try:
+            q.put_nowait(payload)
+        except queue.Full:
+            pass
+
+
+def event_stream():
+    q = register_client()
+    try:
+        while True:
+            payload = q.get()
+            yield send_sse_packet(payload)
+    finally:
+        try:
+            clients.remove(q)
+        except ValueError:
+            pass
+
+
+def create_event_entry(process_name, event_type, severity, likelihood, source='manual'):
+    new_event = {
+        'id': str(uuid.uuid4()),
+        'process_name': process_name,
+        'event_type': event_type,
+        'severity': severity,
+        'likelihood': likelihood,
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'source': source,
+    }
+    events.append(new_event)
+    rich_event = with_risk(new_event)
+    if rich_event['risk_level'] == 'High':
+        create_alert(rich_event)
+    notify_clients({
+        'action': 'reload',
+        'source': source,
+        'event': rich_event,
+    })
+    return new_event
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +239,12 @@ def seed_sample_data():
             "severity": s["severity"],
             "likelihood": s["likelihood"],
             "timestamp": ts,
+            "source": "seed",
         })
+
+    for event in events:
+        if with_risk(event)["risk_level"] == "High":
+            create_alert(with_risk(event))
 
 
 seed_sample_data()
@@ -137,7 +256,94 @@ seed_sample_data()
 
 @app.route("/")
 def index():
-    return redirect(url_for("dashboard"))
+    if session.get('user'):
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('user'):
+        return redirect(url_for('dashboard'))
+
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        user = users.get(username)
+        if not user or not check_password_hash(user['password_hash'], password):
+            error = 'Invalid username or password.'
+        else:
+            session['user'] = username
+            session['role'] = user['role']
+            return redirect(url_for('dashboard'))
+
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/alerts')
+def alerts_page():
+    return render_template('alerts.html', active='alerts')
+
+
+@app.route('/reports')
+def reports_page():
+    return render_template('reports.html', active='reports')
+
+
+@app.route('/reports/download')
+def reports_download():
+    fieldnames = [
+        'id', 'process_name', 'event_type', 'severity', 'likelihood',
+        'risk_score', 'risk_level', 'recommendation', 'confidence', 'created_at', 'source'
+    ]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(fieldnames)
+
+    for e in events:
+        e.setdefault('source', 'manual')
+        e.setdefault('timestamp', '')
+        try:
+            risk = with_risk(e)
+        except Exception:
+            logging.exception('with_risk failed for event; using fallback compute_risk')
+            risk = compute_risk(e.get('severity', 0), e.get('likelihood', 0))
+
+        writer.writerow([
+            e.get('id', ''),
+            e.get('process_name', ''),
+            e.get('event_type', ''),
+            e.get('severity', ''),
+            e.get('likelihood', ''),
+            risk.get('risk_score', ''),
+            risk.get('risk_level', ''),
+            risk.get('recommendation', ''),
+            compute_confidence(e.get('severity', 0), e.get('likelihood', 0)),
+            e.get('timestamp', ''),
+            e.get('source', 'manual'),
+        ])
+
+    data = output.getvalue()
+    output.close()
+
+    return Response(
+        data,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename="risk-report.csv"'}
+    )
+
+
+@app.route('/api/alerts')
+def api_get_alerts():
+    return jsonify(alerts)
 
 
 @app.route("/dashboard")
@@ -198,16 +404,7 @@ def api_create_event():
     if not (1 <= lik <= 5):
         return jsonify({"error": "likelihood must be an integer between 1 and 5"}), 400
 
-    new_event = {
-        "id": str(uuid.uuid4()),
-        "process_name": process_name,
-        "event_type": event_type,
-        "severity": sev,
-        "likelihood": lik,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-    events.append(new_event)
-
+    new_event = create_event_entry(process_name, event_type, sev, lik, source='manual')
     risk_data = with_risk(new_event)
     weighted_score = compute_weighted_score(sev, lik)
     confidence = compute_confidence(sev, lik)
@@ -245,7 +442,12 @@ def api_delete_event(event_id):
     idx = next((i for i, e in enumerate(events) if e["id"] == event_id), None)
     if idx is None:
         return jsonify({"error": "Event not found"}), 404
-    events.pop(idx)
+    deleted = events.pop(idx)
+    notify_clients({
+        'action': 'reload',
+        'source': 'delete',
+        'event': with_risk(deleted),
+    })
     return jsonify({"success": True, "message": "Event deleted successfully"})
 
 
@@ -263,6 +465,7 @@ def api_analytics_summary():
     recent = sorted(wr, key=lambda e: e["timestamp"], reverse=True)[:5]
     return jsonify({
         "total_events": len(wr),
+        "active_alerts": len(alerts),
         "high_risk_count": high,
         "medium_risk_count": medium,
         "low_risk_count": low,
@@ -572,11 +775,44 @@ def api_ml_model_stats():
     })
 
 
+@app.route("/stream")
+def stream():
+    return Response(
+        stream_with_context(event_stream()),
+        content_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def automation_worker():
+    templates = [
+        "Automation health scan",
+        "Auto follow-up alert",
+        "Batch risk recheck",
+        "Automated process validation",
+        "System resiliency event",
+    ]
+
+    while automation_enabled:
+        time.sleep(18)
+        if len(events) >= 120:
+            continue
+
+        if random.random() < 0.65:
+            process_name = random.choice([e["process_name"] for e in events]) if events else "Automation Engine"
+            event_type = random.choice(templates)
+            severity = random.randint(1, 5)
+            likelihood = random.randint(1, 5)
+            create_event_entry(process_name, event_type, severity, likelihood, source='automation')
+
+
 @app.route("/api/health")
 def api_health():
     return jsonify({"status": "ok"})
 
 
 if __name__ == "__main__":
+    thread = threading.Thread(target=automation_worker, daemon=True)
+    thread.start()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

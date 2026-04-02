@@ -9,37 +9,73 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at top left, rgba(96, 165, 250, 0.15), transparent 24%), linear-gradient(180deg, #f8fbff 0%, #eef2ff 60%, #ffffff 100%);
+      color: #0f172a;
+    }
     .badge-high { background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5; }
     .badge-medium { background:#fef3c7;color:#92400e;border:1px solid #fcd34d; }
     .badge-low { background:#d1fae5;color:#065f46;border:1px solid #6ee7b7; }
     .bar-high { background:#ef4444; }
     .bar-medium { background:#f59e0b; }
     .bar-low { background:#10b981; }
-    .nav-link { display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#64748b;transition:all .15s; }
-    .nav-link:hover { background:#f1f5f9;color:#1e293b; }
-    .nav-link.active { background:#eff6ff;color:#1d4ed8; }
+    .nav-link {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 16px;
+      border-radius:12px;
+      font-size:14px;
+      font-weight:600;
+      color:#475569;
+      transition:all .22s ease;
+    }
+    .nav-link:hover {
+      background:rgba(59,130,246,0.12);
+      color:#0f172a;
+      transform:translateX(1px);
+    }
+    .nav-link.active {
+      background:linear-gradient(135deg, rgba(59,130,246,0.16), rgba(59,130,246,0.04));
+      color:#1d4ed8;
+      box-shadow:0 10px 25px rgba(15,23,42,.08);
+    }
     .nav-icon { width:18px;height:18px;flex-shrink:0; }
-    .card { background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06); }
-    .stat-card { border-left:4px solid #e2e8f0; }
-    .toast { position:fixed;bottom:24px;right:24px;z-index:9999;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.15);transition:opacity .3s; }
-    .toast-success { background:#dcfce7;color:#15803d;border:1px solid #86efac; }
-    .toast-error { background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5; }
+    .card {
+      background:#ffffff;
+      border:1px solid rgba(148,163,184,.16);
+      border-radius:22px;
+      box-shadow:0 16px 35px rgba(15,23,42,.08);
+      transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    }
+    .card:hover {
+      transform:translateY(-2px);
+      box-shadow:0 24px 45px rgba(15,23,42,.12);
+    }
+    .stat-card { border-left:4px solid #cbd5e1; }
+    .toast { position:fixed;bottom:24px;right:24px;z-index:9999;padding:14px 20px;border-radius:14px;font-size:14px;font-weight:600;box-shadow:0 18px 40px rgba(15,23,42,.12);transition:opacity .3s; }
+    .toast-success { background:#ecfdf5;color:#166534;border:1px solid #86efac; }
+    .toast-error { background:#fef2f2;color:#991b1b;border:1px solid #fca5a5; }
     .slider-wrap { position:relative;padding:4px 0; }
-    input[type=range] { -webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:#e2e8f0;outline:none; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#1d4ed8;cursor:pointer;border:2px solid #fff;box-shadow:0 0 0 2px #bfdbfe; }
-    .progress-bar { height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden; }
-    .progress-fill { height:100%;border-radius:4px;transition:width .5s; }
+    input[type=range] { -webkit-appearance:none;width:100%;height:8px;border-radius:999px;background:#e2e8f0;outline:none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#2563eb;cursor:pointer;border:3px solid #ffffff;box-shadow:0 0 0 3px rgba(59,130,246,.18); }
+    .progress-bar { height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden; }
+    .progress-fill { height:100%;border-radius:999px;transition:width .45s ease; }
     .accordion-body { display:none; }
     .accordion-body.open { display:block; }
-    .tab-btn { padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:transparent;color:#64748b;transition:all .15s; }
-    .tab-btn.active { background:#fff;color:#1e293b;box-shadow:0 1px 3px rgba(0,0,0,.1); }
+    .tab-btn { padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:transparent;color:#64748b;transition:all .18s ease; }
+    .tab-btn.active { background:#ffffff;color:#0f172a;box-shadow:0 12px 25px rgba(15,23,42,.08); }
+    tbody tr { transition:background .2s ease, transform .2s ease; }
+    tbody tr:hover { background:#f8fafc; transform:translateY(-0.5px); }
+    .toast + .toast { margin-top:10px; }
     @keyframes fadeInUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
     .fade-in { animation:fadeInUp .3s ease; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
 
+{% if current_user %}
 <!-- Sidebar -->
 <div class="fixed inset-y-0 left-0 w-60 bg-white border-r border-slate-200 flex flex-col z-50">
   <div class="px-5 py-5 border-b border-slate-100">
@@ -68,16 +104,45 @@
       <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
       Analytics
     </a>
+    <a href="/alerts" class="nav-link {% if active == 'alerts' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M5.22 11.22a7.5 7.5 0 0113.56 0M12 20a9 9 0 009-9h-2a7 7 0 11-14 0H3a9 9 0 009 9z"/></svg>
+      Alerts
+    </a>
+    <a href="/reports" class="nav-link {% if active == 'reports' %}active{% endif %}">
+      <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V6a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+      Reports
+    </a>
     <a href="/ai-engine" class="nav-link {% if active == 'ai_engine' %}active{% endif %}">
       <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-2"/></svg>
       Intelligence Engine
     </a>
   </nav>
-  <div class="px-4 py-3 border-t border-slate-100 text-xs text-slate-400">v2.1.0 &mdash; Flask Edition</div>
+  <div class="px-4 py-4 border-t border-slate-100">
+    <div class="text-xs text-slate-400 mb-2">Signed in as</div>
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <div class="text-sm font-semibold text-slate-800">{{ current_user.username }}</div>
+        <div class="text-xs text-slate-400 capitalize">{{ current_user.role }}</div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="text-xs text-slate-500 hover:text-slate-900">Logout</a>
+    </div>
+  </div>
 </div>
+{% endif %}
 
 <!-- Main content -->
-<div class="ml-60 min-h-screen flex flex-col">
+<div class="{{ 'ml-60' if current_user else '' }} min-h-screen flex flex-col">
+  <div class="bg-slate-100 border-b border-slate-200 px-8 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-sm text-slate-600">
+    <div>
+      {% if current_user %}
+      <span class="font-semibold text-slate-700">Welcome back, {{ current_user.username }}.</span>
+      <span class="hidden md:inline">Your risk governance dashboard is live.</span>
+      {% else %}
+      <span class="font-semibold text-slate-700">Please sign in to access the Risk Governance Console.</span>
+      {% endif %}
+    </div>
+    <div id="realtime-status" class="font-semibold text-slate-500">{% if current_user %}Realtime: connecting...{% endif %}</div>
+  </div>
   <main class="flex-1 p-8 max-w-7xl mx-auto w-full">
     {% block content %}{% endblock %}
   </main>
@@ -107,6 +172,29 @@ function timeAgo(iso) {
 
 function shortTime(iso) {
   return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function setRealtimeStatus(message, color) {
+  const el = document.getElementById('realtime-status');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `font-medium ${color}`;
+}
+
+if (window.EventSource) {
+  const source = new EventSource('/stream');
+  source.addEventListener('open', () => setRealtimeStatus('Realtime: connected', 'text-emerald-600'));
+  source.addEventListener('error', () => setRealtimeStatus('Realtime: disconnected', 'text-rose-600'));
+  source.addEventListener('message', (evt) => {
+    try {
+      const payload = JSON.parse(evt.data);
+      window.dispatchEvent(new CustomEvent('sse:update', {detail: payload}));
+    } catch (error) {
+      console.warn('Invalid SSE payload', error);
+    }
+  });
+} else {
+  setRealtimeStatus('Realtime: not supported', 'text-rose-600');
 }
 </script>
 

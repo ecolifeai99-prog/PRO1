@@ -123,5 +123,14 @@ async function deleteEvent(id, btn) {
 }
 
 loadEvents();
+
+window.addEventListener('sse:update', event => {
+  if (event.detail && event.detail.action === 'reload') {
+    loadEvents();
+    if (event.detail.source === 'automation') {
+      showToast('Live risk log updated with automated event.');
+    }
+  }
+});
 </script>
 {% endblock %}

@@ -64,8 +64,8 @@
         <p class="text-sm text-slate-500 mt-0.5">Risk intelligence engine has processed the event.</p>
       </div>
       <div class="p-6 space-y-5">
-        <div id="anomaly-banner" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-red-700">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01"/></svg>
+        <div id="anomaly-banner" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 items-center gap-2 text-red-700">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01"/></svg>
           <span class="font-semibold">Anomaly Detected</span>
           <span id="anomaly-score-text" class="text-sm ml-auto opacity-75"></span>
         </div>
@@ -161,16 +161,23 @@ async function submitEvent() {
     document.getElementById('r-risk-badge').innerHTML = riskBadge(data.risk_level);
     document.getElementById('r-recommendation').textContent = data.recommendation;
 
+    const anomalyBanner = document.getElementById('anomaly-banner');
     if (data.is_anomaly) {
-      document.getElementById('anomaly-banner').classList.remove('hidden');
+      anomalyBanner.classList.remove('hidden');
+      anomalyBanner.classList.add('flex');
       document.getElementById('anomaly-score-text').textContent = 'Score: ' + (data.anomaly_score * 100).toFixed(0) + '%';
     } else {
-      document.getElementById('anomaly-banner').classList.add('hidden');
+      anomalyBanner.classList.add('hidden');
+      anomalyBanner.classList.remove('flex');
+      document.getElementById('anomaly-score-text').textContent = '';
     }
 
     if (data.contributing_factors && data.contributing_factors.length) {
       document.getElementById('r-factors-section').classList.remove('hidden');
       document.getElementById('r-factors').innerHTML = data.contributing_factors.map(f => `<li>${f}</li>`).join('');
+    } else {
+      document.getElementById('r-factors-section').classList.add('hidden');
+      document.getElementById('r-factors').innerHTML = '';
     }
 
     showToast('Event logged successfully. Risk score calculated.');
