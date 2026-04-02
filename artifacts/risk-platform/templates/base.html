@@ -181,6 +181,7 @@ function setRealtimeStatus(message, color) {
   el.className = `font-medium ${color}`;
 }
 
+{% if current_user %}
 if (window.EventSource) {
   const source = new EventSource('/stream');
   source.addEventListener('open', () => setRealtimeStatus('Realtime: connected', 'text-emerald-600'));
@@ -196,6 +197,7 @@ if (window.EventSource) {
 } else {
   setRealtimeStatus('Realtime: not supported', 'text-rose-600');
 }
+{% endif %}
 </script>
 
 {% block scripts %}{% endblock %}

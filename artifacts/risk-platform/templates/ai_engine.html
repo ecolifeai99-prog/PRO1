@@ -16,7 +16,7 @@
     <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Events Analyzed</div><div class="text-2xl font-black font-mono" id="ms-events">—</div></div>
     <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Anomalies</div><div class="text-2xl font-black font-mono" id="ms-anomalies">—</div></div>
     <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Anomaly Rate</div><div class="text-2xl font-black font-mono" id="ms-anomaly-rate">—</div></div>
-    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Model Accuracy</div><div class="text-2xl font-black font-mono" id="ms-accuracy">—</div></div>
+    <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">Trained Accuracy</div><div class="text-2xl font-black font-mono" id="ms-accuracy">—</div></div>
     <div class="card text-center p-4 border-l-4 border-l-blue-400"><div class="text-xs font-bold uppercase text-slate-400 tracking-wider mb-1">F1 Score</div><div class="text-2xl font-black font-mono" id="ms-f1">—</div></div>
   </div>
 
@@ -96,7 +96,7 @@
         <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"/></svg>
         Linear Regression Predictions
       </h2>
-      <p class="text-sm text-slate-500 mt-0.5">Forecasted risk levels based on historical data patterns</p>
+      <p class="text-sm text-slate-500 mt-0.5">Forecasted risk levels combining the trained regressor with per-process trend data</p>
     </div>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">

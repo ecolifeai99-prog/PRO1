@@ -1,107 +1,98 @@
 # AI-Driven Process Intelligence and Risk Governance Platform
 
-A single-service Flask web application for tracking process events and assessing risk using AI-driven scoring algorithms. All data is stored in memory — no external database required.
+This project is a Flask-based risk monitoring dashboard with login protection, live system telemetry, in-memory event tracking, and a trained risk model for analytics and prediction.
 
----
+## What It Does
+
+- Captures manual risk events through the UI and API
+- Monitors the local machine with `psutil` for CPU, memory, disk, and high-usage processes
+- Streams live updates to the dashboard with Server-Sent Events
+- Computes risk scoring, anomaly detection, trend analysis, health scoring, and predictions
+- Exposes a trained regression-based model from current event history instead of fixed placeholder metrics
 
 ## Requirements
 
-- Python 3.9+
-- pip
-
----
+- Python 3.11+ recommended
+- `pip`
 
 ## Setup
 
-### 1. Clone the repository
+From the project root:
 
-```bash
-git clone <your-repo-url>
-cd <repo-folder>
-```
-
-### 2. Create a virtual environment (recommended)
-
-```bash
+```powershell
+cd C:\Users\Lenovo\Desktop\anuseai\prod1\prod
 python -m venv venv
-source venv/bin/activate        # macOS / Linux
-venv\Scripts\activate           # Windows
+venv\Scripts\activate
+pip install -r artifacts\risk-platform\requirements.txt
 ```
 
-### 3. Install dependencies
+If the bundled virtual environment already exists, you can reuse it.
 
-```bash
-pip install -r artifacts/risk-platform/requirements.txt
+## Run The App
+
+```powershell
+cd C:\Users\Lenovo\Desktop\anuseai\prod1\prod\artifacts\risk-platform
+..\..\venv\Scripts\python.exe app.py
 ```
 
----
+The app starts on `http://localhost:5000` by default.
 
-## Running the app
+To use a different port on Windows PowerShell:
 
-```bash
-cd artifacts/risk-platform
-python app.py
+```powershell
+$env:PORT=8080
+..\..\venv\Scripts\python.exe app.py
 ```
 
-The app will start on port **5000** by default.  
-Open your browser at: [http://localhost:5000](http://localhost:5000)
-
-The system now includes login access control and report export support.
+## Login
 
 Default accounts:
-- admin / Admin123!
-- user / User123!
 
-To use a different port:
+- `admin / Admin123!`
+- `user / User123!`
 
-```bash
-PORT=8080 python app.py
-```
+## Current Behavior
 
----
-
-## Storage
-
-All event data is stored **in memory only**. There is no database, no file writes, and no external dependencies. Data resets every time the server restarts. This is intentional — the application is designed to be fully self-contained and stateless between sessions.
-
-## Real-Time Automation
-
-- The app now exposes a server-sent events stream at `/stream` for live dashboard and analytics updates.
-- New events are pushed instantly to connected browser clients.
-- A background automation worker generates synthetic risk events periodically so the dashboard stays active and the intelligence engine can demonstrate continuous change.
-
-The in-memory store is seeded with 36 sample events across 8 processes on startup, so the dashboard and analytics pages are populated immediately.
-
----
+- Data is stored in memory only and resets on restart
+- System monitoring starts automatically when the app loads
+- Initial machine snapshots are captured on startup so the dashboard is not empty
+- Realtime updates are available after login through `/stream`
+- Health checks are available without login through `/api/health`
 
 ## Pages
 
 | URL | Description |
 |-----|-------------|
-| `/dashboard` | Command Center — stats, recent events, high-risk feed |
-| `/add-event` | Record a new process event and view live risk analysis |
-| `/risk-analysis` | Full event log with filter, search, and delete |
-| `/analytics` | Risk distribution chart and events-per-process bar chart |
-| `/ai-engine` | ML model stats, anomaly detection, EMA trends, health index, predictions |
-| `/alerts` | Active high-risk alert feed |
-| `/reports` | CSV report export and risk summary |
-
----
+| `/login` | Sign-in page |
+| `/dashboard` | Main command center with live metrics |
+| `/add-event` | Create a manual event and view risk analysis |
+| `/risk-analysis` | Full event log with delete support |
+| `/analytics` | Aggregate charts and summaries |
+| `/alerts` | High-risk alert feed |
+| `/reports` | CSV export and summary data |
+| `/ai-engine` | Model metrics, anomalies, trends, health, and predictions |
 
 ## API Endpoints
 
-All endpoints are served by the same Flask process.
+### Core
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | App health, monitor status, event count, model version |
+| `GET` | `/api/system/status` | Live local-system telemetry and top processes |
+| `GET` | `/stream` | Server-Sent Events stream for live UI refresh |
 
 ### Events
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/events` | All events with risk analysis |
-| `POST` | `/api/events` | Create a new event |
-| `GET` | `/api/events/<id>` | Single event by ID |
+| `GET` | `/api/events` | All events with computed risk |
+| `POST` | `/api/events` | Create a manual event |
+| `GET` | `/api/events/<id>` | Fetch a single event |
 | `DELETE` | `/api/events/<id>` | Delete an event |
 
-**POST `/api/events` body (JSON):**
+Example request:
+
 ```json
 {
   "process_name": "Payment Processing",
@@ -110,64 +101,69 @@ All endpoints are served by the same Flask process.
   "likelihood": 3
 }
 ```
-`severity` and `likelihood` must be integers between 1 and 5.
 
 ### Analytics
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/analytics/summary` | Totals, averages, and 5 most recent events |
-| `GET` | `/api/analytics/risk-distribution` | Count of events per risk level |
-| `GET` | `/api/analytics/events-per-process` | Event counts broken down by process and risk level |
-| `GET` | `/api/analytics/recent-activity` | 5 most recent high-risk events |
+| `GET` | `/api/analytics/summary` | Totals, averages, and recent events |
+| `GET` | `/api/analytics/risk-distribution` | Counts by risk level |
+| `GET` | `/api/analytics/events-per-process` | Per-process event rollup |
+| `GET` | `/api/analytics/recent-activity` | Most recent high-risk events |
+| `GET` | `/api/alerts` | Current alert list |
 
-### ML / Intelligence Engine
+### Intelligence / ML
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/ml/model-info` | Algorithm descriptions and metadata |
-| `GET` | `/api/ml/model-stats` | Aggregate model performance metrics |
-| `GET` | `/api/ml/anomalies` | Z-score anomaly detection results |
-| `GET` | `/api/ml/trends` | EMA trend direction per process |
-| `GET` | `/api/ml/process-health` | Multi-factor health index per process |
-| `GET` | `/api/ml/predictions` | OLS linear regression risk forecasts |
+| `GET` | `/api/ml/model-info` | Live model metadata and algorithm descriptions |
+| `GET` | `/api/ml/model-stats` | Trained-model metrics and aggregate statistics |
+| `GET` | `/api/ml/anomalies` | Z-score anomaly results |
+| `GET` | `/api/ml/trends` | EMA-based trend analysis per process |
+| `GET` | `/api/ml/process-health` | Composite health score per process |
+| `GET` | `/api/ml/predictions` | Forecasted risk scores using trained model plus trend data |
 
----
+## Risk Model
 
-## Risk Scoring
+The application uses two layers:
 
-Risk Score = `severity × likelihood` (range: 1–25)
+- Rule-based risk scoring: `severity * likelihood`
+- Trained regression model: learns from current event history using severity, likelihood, and their interaction term
 
-| Score Range | Level | Recommendation |
-|-------------|-------|----------------|
-| 1 – 5 | Low | No immediate action needed |
-| 6 – 12 | Medium | Monitor closely |
-| 13 – 25 | High | Immediate attention required |
+The AI engine also reports:
 
----
+- Classification-style accuracy, precision, recall, and F1
+- Regression metrics including MAE, RMSE, and R-squared
+- Statistical anomaly detection
+- EMA trend tracking
+- Per-process health scoring
 
-## AI Algorithms
+## Dependencies
 
-1. **Weighted Risk Matrix** — weighted score formula: `(severity × 0.6 + likelihood × 0.4) × severity`
-2. **Z-Score Anomaly Detector** — flags events that deviate more than ±2σ from the population mean
-3. **EMA Trend Detector** — exponential moving average (α = 0.3) to track risk direction per process
-4. **Multi-Factor Process Health Index** — composite 0–100 health score per process
-5. **OLS Linear Regression Risk Velocity** — predicts next risk score with 95% confidence interval
-
----
+- `flask>=3.0.0`
+- `psutil>=5.9.0`
 
 ## Project Structure
 
-```
-artifacts/risk-platform/
-├── app.py              # Flask application — all routes, risk logic, in-memory store
-├── requirements.txt    # Python dependencies
-├── templates/
-│   ├── base.html           # Base layout with navigation and shared JS
-│   ├── dashboard.html      # Command Center page
-│   ├── add_event.html      # Record Event page
-│   ├── risk_analysis.html  # Risk Log page
-│   ├── analytics.html      # Analytics charts page
-│   └── ai_engine.html      # Intelligence Engine page
-└── static/             # Static assets (CSS/JS overrides if needed)
+```text
+prod/
+├── README.md
+├── artifacts/
+│   └── risk-platform/
+│       ├── app.py
+│       ├── requirements.txt
+│       ├── templates/
+│       │   ├── base.html
+│       │   ├── login.html
+│       │   ├── dashboard.html
+│       │   ├── add_event.html
+│       │   ├── risk_analysis.html
+│       │   ├── analytics.html
+│       │   ├── alerts.html
+│       │   ├── reports.html
+│       │   └── ai_engine.html
+│       └── test_events.py
+├── main.py
+├── pyproject.toml
+└── package.json
 ```

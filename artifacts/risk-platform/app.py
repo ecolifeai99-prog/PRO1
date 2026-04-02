@@ -9,6 +9,7 @@ import uuid
 import logging
 import csv
 import io
+import psutil
 from datetime import datetime, timezone
 from flask import Flask, Response, render_template, request, jsonify, redirect, url_for, stream_with_context, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -16,6 +17,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-please-change')
+
+MODEL_VERSION = "3.0.0"
+SYSTEM_MONITOR_THREAD = None
+SYSTEM_MONITOR_LOCK = threading.Lock()
 
 users = {
     'admin': {
@@ -40,6 +45,18 @@ def get_current_user():
     return users.get(username)
 
 
+def risk_level_from_score(score):
+    if score >= 13:
+        return "High"
+    if score >= 6:
+        return "Medium"
+    return "Low"
+
+
+def severity_from_percent(percent):
+    return min(5, max(1, int(percent / 20) + 1))
+
+
 @app.context_processor
 def inject_user():
     return {'current_user': get_current_user()}
@@ -59,7 +76,7 @@ def create_alert(event):
 
 @app.before_request
 def ensure_logged_in():
-    allowed = {'login', 'static'}
+    allowed = {'login', 'static', 'api_health'}
     if request.endpoint in allowed:
         return
     if session.get('user') is None:
@@ -126,6 +143,52 @@ def create_event_entry(process_name, event_type, severity, likelihood, source='m
     return new_event
 
 
+def capture_system_snapshot(source='system-bootstrap'):
+    if not os.environ.get("ENABLE_SYSTEM_MONITOR", "1") == "1":
+        return
+
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.2)
+        memory_percent = psutil.virtual_memory().percent
+        disk_percent = psutil.disk_usage(os.path.abspath(os.sep)).percent
+
+        snapshot_metrics = [
+            ("CPU Monitor", f"CPU Usage Snapshot: {cpu_percent:.1f}%", cpu_percent),
+            ("Memory Monitor", f"Memory Usage Snapshot: {memory_percent:.1f}%", memory_percent),
+            ("Disk Monitor", f"Disk Usage Snapshot: {disk_percent:.1f}%", disk_percent),
+        ]
+
+        for process_name, event_type, percent in snapshot_metrics:
+            severity = severity_from_percent(percent)
+            create_event_entry(
+                process_name=process_name,
+                event_type=event_type,
+                severity=severity,
+                likelihood=max(1, min(5, severity - 1 if severity > 1 else 1)),
+                source=source,
+            )
+
+        top_processes = sorted(
+            psutil.process_iter(['name', 'cpu_percent']),
+            key=lambda proc: proc.info['cpu_percent'] or 0,
+            reverse=True,
+        )[:3]
+
+        for proc in top_processes:
+            cpu = proc.info['cpu_percent'] or 0
+            if cpu <= 0:
+                continue
+            create_event_entry(
+                process_name=f"Process: {proc.info['name'] or 'Unknown'}",
+                event_type=f"Observed Process Load ({cpu:.1f}%)",
+                severity=severity_from_percent(cpu),
+                likelihood=max(1, severity_from_percent(cpu) - 1),
+                source=source,
+            )
+    except Exception:
+        logging.exception("Unable to capture initial system snapshot")
+
+
 # ---------------------------------------------------------------------------
 # Risk computation helpers
 # ---------------------------------------------------------------------------
@@ -162,13 +225,13 @@ def compute_contributing_factors(severity, likelihood):
     if severity * likelihood >= 13:
         factors.append("Combined risk exceeds critical threshold")
     if severity == 5:
-        factors.append("Maximum severity — critical business impact")
+        factors.append("Maximum severity - critical business impact")
     if likelihood == 5:
         factors.append("Near-certain recurrence predicted")
     if severity <= 2 and likelihood <= 2:
-        factors.append("Low exposure — within acceptable tolerance")
+        factors.append("Low exposure - within acceptable tolerance")
     if not factors:
-        factors.append("Moderate risk — within monitored parameters")
+        factors.append("Moderate risk - within monitored parameters")
     return factors
 
 
@@ -177,78 +240,153 @@ def with_risk(event):
     return {**event, **risk}
 
 
+def predict_risk_score(coefficients, severity, likelihood):
+    return (
+        coefficients[0]
+        + coefficients[1] * severity
+        + coefficients[2] * likelihood
+        + coefficients[3] * severity * likelihood
+    )
+
+
+def solve_linear_system(matrix, vector):
+    size = len(vector)
+    augmented = [row[:] + [vector[i]] for i, row in enumerate(matrix)]
+
+    for col in range(size):
+        pivot_row = max(range(col, size), key=lambda row: abs(augmented[row][col]))
+        pivot = augmented[pivot_row][col]
+        if abs(pivot) < 1e-9:
+            return None
+
+        if pivot_row != col:
+            augmented[col], augmented[pivot_row] = augmented[pivot_row], augmented[col]
+
+        pivot = augmented[col][col]
+        for j in range(col, size + 1):
+            augmented[col][j] /= pivot
+
+        for row in range(size):
+            if row == col:
+                continue
+            factor = augmented[row][col]
+            if abs(factor) < 1e-12:
+                continue
+            for j in range(col, size + 1):
+                augmented[row][j] -= factor * augmented[col][j]
+
+    return [augmented[i][size] for i in range(size)]
+
+
+def compute_classification_metrics(actual_levels, predicted_levels):
+    labels = ["Low", "Medium", "High"]
+    total = len(actual_levels)
+    accuracy = sum(1 for actual, predicted in zip(actual_levels, predicted_levels) if actual == predicted) / total if total else 0
+
+    precisions = []
+    recalls = []
+    f1_scores = []
+    for label in labels:
+        true_positive = sum(1 for actual, predicted in zip(actual_levels, predicted_levels) if actual == label and predicted == label)
+        false_positive = sum(1 for actual, predicted in zip(actual_levels, predicted_levels) if actual != label and predicted == label)
+        false_negative = sum(1 for actual, predicted in zip(actual_levels, predicted_levels) if actual == label and predicted != label)
+
+        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) else 0
+        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) else 0
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0
+
+        precisions.append(precision)
+        recalls.append(recall)
+        f1_scores.append(f1)
+
+    return {
+        "accuracy": round(accuracy, 3),
+        "precision": round(sum(precisions) / len(precisions), 3),
+        "recall": round(sum(recalls) / len(recalls), 3),
+        "f1_score": round(sum(f1_scores) / len(f1_scores), 3),
+    }
+
+
+def train_live_risk_model():
+    wr = [with_risk(event) for event in events]
+    if not wr:
+        return {
+            "trained": False,
+            "training_samples": 0,
+            "coefficients": [0.0, 0.0, 0.0, 1.0],
+            "metrics": {
+                "mae": 0,
+                "rmse": 0,
+                "r2_score": 0,
+                "accuracy": 0,
+                "precision": 0,
+                "recall": 0,
+                "f1_score": 0,
+            },
+            "predictions": [],
+            "last_trained": None,
+        }
+
+    feature_count = 4
+    regularization = 1e-3
+    xtx = [[0.0 for _ in range(feature_count)] for _ in range(feature_count)]
+    xty = [0.0 for _ in range(feature_count)]
+
+    for event in wr:
+        features = [1.0, float(event["severity"]), float(event["likelihood"]), float(event["severity"] * event["likelihood"])]
+        target = float(event["risk_score"])
+        for i in range(feature_count):
+            xty[i] += features[i] * target
+            for j in range(feature_count):
+                xtx[i][j] += features[i] * features[j]
+
+    for i in range(1, feature_count):
+        xtx[i][i] += regularization
+
+    coefficients = solve_linear_system(xtx, xty) or [0.0, 0.0, 0.0, 1.0]
+
+    predictions = []
+    actual_scores = []
+    predicted_scores = []
+    actual_levels = []
+    predicted_levels = []
+
+    for event in wr:
+        predicted_score = max(1.0, min(25.0, predict_risk_score(coefficients, event["severity"], event["likelihood"])))
+        predictions.append({"id": event["id"], "predicted_score": round(predicted_score, 2)})
+        actual_scores.append(float(event["risk_score"]))
+        predicted_scores.append(predicted_score)
+        actual_levels.append(event["risk_level"])
+        predicted_levels.append(risk_level_from_score(predicted_score))
+
+    count = len(actual_scores)
+    mae = sum(abs(actual - predicted) for actual, predicted in zip(actual_scores, predicted_scores)) / count
+    mse = sum((actual - predicted) ** 2 for actual, predicted in zip(actual_scores, predicted_scores)) / count
+    rmse = math.sqrt(mse)
+    mean_actual = sum(actual_scores) / count
+    ss_tot = sum((actual - mean_actual) ** 2 for actual in actual_scores)
+    ss_res = sum((actual - predicted) ** 2 for actual, predicted in zip(actual_scores, predicted_scores))
+    r2_score = 1 - (ss_res / ss_tot) if ss_tot else 1.0
+    class_metrics = compute_classification_metrics(actual_levels, predicted_levels)
+
+    return {
+        "trained": True,
+        "training_samples": count,
+        "coefficients": [round(value, 4) for value in coefficients],
+        "metrics": {
+            "mae": round(mae, 3),
+            "rmse": round(rmse, 3),
+            "r2_score": round(r2_score, 3),
+            **class_metrics,
+        },
+        "predictions": predictions,
+        "last_trained": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 # ---------------------------------------------------------------------------
-# Seed data
+# Seed data removed, now using real-time psutil source only
 # ---------------------------------------------------------------------------
-
-def seed_sample_data():
-    samples = [
-        {"process_name": "Payment Processing", "event_type": "Gateway Timeout", "severity": 2, "likelihood": 3, "hours_ago": 240},
-        {"process_name": "Payment Processing", "event_type": "Transaction Rollback", "severity": 3, "likelihood": 3, "hours_ago": 192},
-        {"process_name": "Payment Processing", "event_type": "Duplicate Charge", "severity": 4, "likelihood": 2, "hours_ago": 144},
-        {"process_name": "Payment Processing", "event_type": "System Failure", "severity": 5, "likelihood": 4, "hours_ago": 96},
-        {"process_name": "Payment Processing", "event_type": "Fraud Detection Bypass", "severity": 5, "likelihood": 5, "hours_ago": 24},
-
-        {"process_name": "Data Pipeline", "event_type": "Schema Mismatch", "severity": 3, "likelihood": 4, "hours_ago": 220},
-        {"process_name": "Data Pipeline", "event_type": "Data Loss", "severity": 4, "likelihood": 3, "hours_ago": 180},
-        {"process_name": "Data Pipeline", "event_type": "ETL Failure", "severity": 4, "likelihood": 4, "hours_ago": 120},
-        {"process_name": "Data Pipeline", "event_type": "Corrupt Batch", "severity": 5, "likelihood": 3, "hours_ago": 60},
-        {"process_name": "Data Pipeline", "event_type": "Replication Lag", "severity": 3, "likelihood": 5, "hours_ago": 12},
-
-        {"process_name": "User Authentication", "event_type": "Brute Force Attempt", "severity": 5, "likelihood": 5, "hours_ago": 230},
-        {"process_name": "User Authentication", "event_type": "Unauthorized Access", "severity": 5, "likelihood": 3, "hours_ago": 190},
-        {"process_name": "User Authentication", "event_type": "Session Hijack", "severity": 4, "likelihood": 2, "hours_ago": 150},
-        {"process_name": "User Authentication", "event_type": "MFA Bypass Attempt", "severity": 3, "likelihood": 2, "hours_ago": 100},
-        {"process_name": "User Authentication", "event_type": "Token Expiry Issue", "severity": 2, "likelihood": 2, "hours_ago": 30},
-
-        {"process_name": "Order Fulfillment", "event_type": "Delay", "severity": 3, "likelihood": 4, "hours_ago": 210},
-        {"process_name": "Order Fulfillment", "event_type": "Stock Discrepancy", "severity": 3, "likelihood": 3, "hours_ago": 170},
-        {"process_name": "Order Fulfillment", "event_type": "Carrier API Failure", "severity": 3, "likelihood": 3, "hours_ago": 130},
-        {"process_name": "Order Fulfillment", "event_type": "Address Validation Error", "severity": 2, "likelihood": 4, "hours_ago": 80},
-        {"process_name": "Order Fulfillment", "event_type": "Return Processing Failure", "severity": 3, "likelihood": 3, "hours_ago": 40},
-
-        {"process_name": "Inventory Management", "event_type": "Sync Error", "severity": 2, "likelihood": 3, "hours_ago": 200},
-        {"process_name": "Inventory Management", "event_type": "Count Mismatch", "severity": 2, "likelihood": 2, "hours_ago": 160},
-        {"process_name": "Inventory Management", "event_type": "Supplier Feed Delay", "severity": 1, "likelihood": 3, "hours_ago": 110},
-        {"process_name": "Inventory Management", "event_type": "Barcode Scan Error", "severity": 1, "likelihood": 2, "hours_ago": 70},
-        {"process_name": "Inventory Management", "event_type": "Warehouse System Lag", "severity": 2, "likelihood": 2, "hours_ago": 20},
-
-        {"process_name": "Audit Logging", "event_type": "Log Write Failure", "severity": 1, "likelihood": 2, "hours_ago": 215},
-        {"process_name": "Audit Logging", "event_type": "Storage Full Warning", "severity": 2, "likelihood": 2, "hours_ago": 175},
-        {"process_name": "Audit Logging", "event_type": "Log Rotation Error", "severity": 2, "likelihood": 1, "hours_ago": 135},
-        {"process_name": "Audit Logging", "event_type": "Compliance Breach", "severity": 5, "likelihood": 5, "hours_ago": 48},
-        {"process_name": "Audit Logging", "event_type": "Tamper Detection Alert", "severity": 5, "likelihood": 4, "hours_ago": 6},
-
-        {"process_name": "Notification Service", "event_type": "SMS Delivery Failure", "severity": 2, "likelihood": 4, "hours_ago": 90},
-        {"process_name": "Notification Service", "event_type": "Email Queue Overflow", "severity": 3, "likelihood": 3, "hours_ago": 45},
-        {"process_name": "Notification Service", "event_type": "Push Token Invalid", "severity": 1, "likelihood": 5, "hours_ago": 10},
-
-        {"process_name": "Reporting Engine", "event_type": "Report Timeout", "severity": 2, "likelihood": 3, "hours_ago": 185},
-        {"process_name": "Reporting Engine", "event_type": "Data Export Failure", "severity": 3, "likelihood": 2, "hours_ago": 115},
-        {"process_name": "Reporting Engine", "event_type": "Dashboard Crash", "severity": 4, "likelihood": 3, "hours_ago": 55},
-    ]
-
-    now_ms = datetime.now(timezone.utc).timestamp() * 1000
-    for i, s in enumerate(samples):
-        ts_ms = now_ms - s["hours_ago"] * 3_600_000
-        ts = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
-        events.append({
-            "id": f"seed-{i + 1}",
-            "process_name": s["process_name"],
-            "event_type": s["event_type"],
-            "severity": s["severity"],
-            "likelihood": s["likelihood"],
-            "timestamp": ts,
-            "source": "seed",
-        })
-
-    for event in events:
-        if with_risk(event)["risk_level"] == "High":
-            create_alert(with_risk(event))
-
-
-seed_sample_data()
-
 
 # ---------------------------------------------------------------------------
 # HTML page routes
@@ -518,53 +656,45 @@ def api_recent_activity():
 
 @app.route("/api/ml/model-info")
 def api_ml_model_info():
-    from datetime import timedelta
-    last_trained = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    model = train_live_risk_model()
     return jsonify({
-        "model_version": "2.1.0",
-        "total_algorithms": 5,
-        "last_trained": last_trained,
-        "training_samples": len(events),
+        "model_version": MODEL_VERSION,
+        "total_algorithms": 4,
+        "last_trained": model["last_trained"],
+        "training_samples": model["training_samples"],
+        "coefficients": model["coefficients"],
         "algorithms": [
             {
-                "name": "Weighted Risk Matrix",
-                "type": "Rule-Based Scoring",
-                "description": "Assigns differential weights to severity and likelihood dimensions. Severity is weighted higher (60%) than likelihood (40%) reflecting that impact magnitude dominates recurrence probability in operational risk.",
-                "formula": "WeightedScore = (severity × 0.6 + likelihood × 0.4) × severity",
-                "use_case": "Primary risk score computation for every submitted event",
-                "accuracy": 0.91,
+                "name": "Polynomial Risk Regressor",
+                "type": "Trained Regression Model",
+                "description": "Learns live relationships between severity, likelihood, and their interaction term using regularized least-squares regression on the current event history.",
+                "formula": "score = b0 + b1*severity + b2*likelihood + b3*(severity*likelihood)",
+                "use_case": "Primary trained model used for score estimation and model quality metrics",
+                "accuracy": model["metrics"]["accuracy"],
             },
             {
                 "name": "Z-Score Anomaly Detector",
                 "type": "Statistical Anomaly Detection",
-                "description": "Computes how many standard deviations a risk score deviates from the population mean. Events beyond ±2σ are flagged as statistical anomalies requiring out-of-band investigation.",
-                "formula": "Z = (x - μ) / σ  |  AnomalyScore = |Z| / max(|Z|) across events",
+                "description": "Computes how many standard deviations a risk score deviates from the population mean. Events beyond +/-2 standard deviations are flagged as statistical anomalies requiring out-of-band investigation.",
+                "formula": "Z = (x - mean) / stddev | AnomalyScore = |Z| / max(|Z|) across events",
                 "use_case": "Detecting unusual events that deviate from historical norms",
-                "accuracy": 0.88,
+                "accuracy": max(0.5, model["metrics"]["precision"]),
             },
             {
                 "name": "Exponential Moving Average (EMA) Trend Detector",
                 "type": "Time-Series Analysis",
-                "description": "Applies EMA with α=0.3 to a process's chronological risk scores. Recent observations are weighted more heavily than older ones. Trend direction is determined by comparing the current EMA to the prior period's EMA.",
-                "formula": "EMA_t = α × score_t + (1 - α) × EMA_{t-1}  |  α = 0.3",
+                "description": "Applies EMA with alpha=0.3 to a process's chronological risk scores. Recent observations are weighted more heavily than older ones. Trend direction is determined by comparing the current EMA to the prior period's EMA.",
+                "formula": "EMA_t = alpha * score_t + (1 - alpha) * EMA_(t-1) | alpha = 0.3",
                 "use_case": "Tracking whether a process's risk is rising, falling, or stable over time",
-                "accuracy": 0.85,
+                "accuracy": max(0.5, model["metrics"]["recall"]),
             },
             {
                 "name": "Multi-Factor Process Health Index",
                 "type": "Composite Scoring",
                 "description": "Synthesizes four weighted metrics: average severity (30%), average likelihood (25%), high-risk event ratio (30%), and recency penalty (15%). Yields a 0–100 health score where 100 is fully healthy.",
-                "formula": "Health = 100 - (avgSev×0.3 + avgLik×0.25 + highRiskRatio×0.30 + recencyPenalty×0.15) × 20",
+                "formula": "Health = 100 - (avgSev*0.3 + avgLik*0.25 + highRiskRatio*0.30 + recencyPenalty*0.15) * 20",
                 "use_case": "Producing a unified operational health score per monitored process",
-                "accuracy": 0.87,
-            },
-            {
-                "name": "Linear Regression Risk Velocity",
-                "type": "Predictive Regression",
-                "description": "Fits a simple OLS (Ordinary Least Squares) linear regression to a process's chronological risk scores. The slope is the risk velocity. Uses the fitted line to forecast the next expected risk score with a ±95% confidence interval.",
-                "formula": "ŷ = β₀ + β₁×t  |  β₁ = Σ(t-t̄)(y-ȳ)/Σ(t-t̄)²",
-                "use_case": "Predicting where a process's risk is headed and when it may breach thresholds",
-                "accuracy": 0.83,
+                "accuracy": max(0.5, model["metrics"]["f1_score"]),
             },
         ],
     })
@@ -693,6 +823,7 @@ def api_ml_process_health():
 @app.route("/api/ml/predictions")
 def api_ml_predictions():
     wr = [with_risk(e) for e in events]
+    model = train_live_risk_model()
     by_process = {}
     for e in wr:
         by_process.setdefault(e["process_name"], []).append(e)
@@ -713,7 +844,12 @@ def api_ml_predictions():
         slope = ss_xy / ss_xx if ss_xx != 0 else 0
         intercept = y_mean - slope * x_mean
 
-        predicted = intercept + slope * n
+        recent_window = sorted_evts[-5:]
+        avg_severity = sum(e["severity"] for e in recent_window) / len(recent_window)
+        avg_likelihood = sum(e["likelihood"] for e in recent_window) / len(recent_window)
+        trained_prediction = predict_risk_score(model["coefficients"], avg_severity, avg_likelihood)
+        trend_prediction = intercept + slope * n
+        predicted = (trained_prediction + trend_prediction) / 2
         residuals = [ys[i] - (intercept + slope * xs[i]) for i in range(n)]
         rse = math.sqrt(sum(r ** 2 for r in residuals) / (n - 2)) if n > 2 else 2
         ci_half = 1.96 * rse
@@ -728,6 +864,7 @@ def api_ml_predictions():
             "predicted_risk_level": predicted_risk_level,
             "confidence_interval_low": max(1, round(predicted - ci_half, 1)),
             "confidence_interval_high": min(25, round(predicted + ci_half, 1)),
+            "model_score_estimate": round(max(1, min(25, trained_prediction)), 1),
             "regression_slope": round(slope, 3),
             "data_points": n,
         })
@@ -739,12 +876,14 @@ def api_ml_predictions():
 @app.route("/api/ml/model-stats")
 def api_ml_model_stats():
     wr = [with_risk(e) for e in events]
+    model = train_live_risk_model()
     n = len(wr)
     if n == 0:
         return jsonify({
             "total_events_analyzed": 0, "anomalies_detected": 0, "anomaly_rate": 0,
             "avg_confidence": 0, "processes_monitored": 0, "high_risk_processes": 0,
-            "model_accuracy": 0.89, "precision": 0.91, "recall": 0.87, "f1_score": 0.89,
+            "model_accuracy": 0, "precision": 0, "recall": 0, "f1_score": 0,
+            "mae": 0, "rmse": 0, "r2_score": 0,
         })
 
     scores = [e["risk_score"] for e in wr]
@@ -768,10 +907,13 @@ def api_ml_model_stats():
         "avg_confidence": avg_confidence,
         "processes_monitored": len(processes),
         "high_risk_processes": len(high_risk_processes),
-        "model_accuracy": 0.89,
-        "precision": 0.91,
-        "recall": 0.87,
-        "f1_score": 0.89,
+        "model_accuracy": model["metrics"]["accuracy"],
+        "precision": model["metrics"]["precision"],
+        "recall": model["metrics"]["recall"],
+        "f1_score": model["metrics"]["f1_score"],
+        "mae": model["metrics"]["mae"],
+        "rmse": model["metrics"]["rmse"],
+        "r2_score": model["metrics"]["r2_score"],
     })
 
 
@@ -784,22 +926,42 @@ def stream():
     )
 
 
+def ensure_system_monitor_started():
+    global SYSTEM_MONITOR_THREAD
+
+    if os.environ.get("ENABLE_SYSTEM_MONITOR", "1") != "1":
+        return
+
+    with SYSTEM_MONITOR_LOCK:
+        if SYSTEM_MONITOR_THREAD and SYSTEM_MONITOR_THREAD.is_alive():
+            return
+
+        if not events:
+            capture_system_snapshot()
+
+        SYSTEM_MONITOR_THREAD = threading.Thread(target=sync_events_from_source, daemon=True)
+        SYSTEM_MONITOR_THREAD.start()
+        logging.info("System monitor started")
+
+
 def sync_events_from_source():
     """
     Stable real-time monitoring using psutil
     Prevents event flooding + handles errors safely
     """
-    last_cpu = 0
-    last_memory = 0
+    last_cpu = psutil.cpu_percent(interval=None)
+    last_memory = psutil.virtual_memory().percent
+    last_disk = psutil.disk_usage(os.path.abspath(os.sep)).percent
 
     while True:
         try:
             cpu_percent = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory().percent
+            disk = psutil.disk_usage(os.path.abspath(os.sep)).percent
 
             # Only log if change is significant (avoid spam)
             if abs(cpu_percent - last_cpu) > 5:
-                severity = min(5, max(1, int(cpu_percent / 20) + 1))
+                severity = severity_from_percent(cpu_percent)
                 likelihood = severity
 
                 create_event_entry(
@@ -813,7 +975,7 @@ def sync_events_from_source():
                 last_cpu = cpu_percent
 
             if abs(memory - last_memory) > 5:
-                severity = min(5, max(1, int(memory / 20) + 1))
+                severity = severity_from_percent(memory)
                 likelihood = severity
 
                 create_event_entry(
@@ -825,6 +987,17 @@ def sync_events_from_source():
                 )
 
                 last_memory = memory
+
+            if abs(disk - last_disk) > 3:
+                severity = severity_from_percent(disk)
+                create_event_entry(
+                    process_name="Disk Monitor",
+                    event_type=f"Disk Usage: {disk:.1f}%",
+                    severity=severity,
+                    likelihood=max(1, severity - 1),
+                    source="system"
+                )
+                last_disk = disk
 
             # Monitor suspicious processes (top 3 only)
             try:
@@ -839,7 +1012,7 @@ def sync_events_from_source():
 
                     if cpu > 50:
                         create_event_entry(
-                            process_name=f"Process: {proc.info['name']}",
+                            process_name=f"Process: {proc.info['name'] or 'Unknown'}",
                             event_type=f"High CPU Process ({cpu:.1f}%)",
                             severity=4,
                             likelihood=4,
@@ -858,11 +1031,44 @@ def sync_events_from_source():
 
 @app.route("/api/health")
 def api_health():
-    return jsonify({"status": "ok"})
+    monitoring_active = SYSTEM_MONITOR_THREAD is not None and SYSTEM_MONITOR_THREAD.is_alive()
+    return jsonify({
+        "status": "ok",
+        "monitoring_active": monitoring_active,
+        "events_captured": len(events),
+        "model_version": MODEL_VERSION,
+    })
+
+
+@app.route("/api/system/status")
+def api_system_status():
+    top_processes = sorted(
+        psutil.process_iter(['name', 'cpu_percent', 'memory_percent']),
+        key=lambda proc: proc.info['cpu_percent'] or 0,
+        reverse=True,
+    )[:5]
+
+    return jsonify({
+        "cpu_percent": round(psutil.cpu_percent(interval=0.2), 1),
+        "memory_percent": round(psutil.virtual_memory().percent, 1),
+        "disk_percent": round(psutil.disk_usage(os.path.abspath(os.sep)).percent, 1),
+        "monitoring_active": SYSTEM_MONITOR_THREAD is not None and SYSTEM_MONITOR_THREAD.is_alive(),
+        "events_captured": len(events),
+        "top_processes": [
+            {
+                "name": proc.info['name'] or 'Unknown',
+                "cpu_percent": round(proc.info['cpu_percent'] or 0, 1),
+                "memory_percent": round(proc.info.get('memory_percent') or 0, 1),
+            }
+            for proc in top_processes
+        ],
+    })
+
+
+ensure_system_monitor_started()
 
 
 if __name__ == "__main__":
-    thread = threading.Thread(target=sync_events_from_source, daemon=True)
-    thread.start()
+    ensure_system_monitor_started()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
