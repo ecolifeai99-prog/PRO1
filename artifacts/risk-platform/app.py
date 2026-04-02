@@ -1,7 +1,6 @@
 import os
 import json
 import math
-import random
 import queue
 import threading
 import time
@@ -9,6 +8,7 @@ import uuid
 import logging
 import csv
 import io
+import psutil
 from datetime import datetime, timezone
 from flask import Flask, Response, render_template, request, jsonify, redirect, url_for, stream_with_context, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -70,7 +70,6 @@ def ensure_logged_in():
 # ---------------------------------------------------------------------------
 events = []
 clients = []
-automation_enabled = True
 
 
 def send_sse_packet(payload):
@@ -181,73 +180,41 @@ def with_risk(event):
 # Seed data
 # ---------------------------------------------------------------------------
 
-def seed_sample_data():
-    samples = [
-        {"process_name": "Payment Processing", "event_type": "Gateway Timeout", "severity": 2, "likelihood": 3, "hours_ago": 240},
-        {"process_name": "Payment Processing", "event_type": "Transaction Rollback", "severity": 3, "likelihood": 3, "hours_ago": 192},
-        {"process_name": "Payment Processing", "event_type": "Duplicate Charge", "severity": 4, "likelihood": 2, "hours_ago": 144},
-        {"process_name": "Payment Processing", "event_type": "System Failure", "severity": 5, "likelihood": 4, "hours_ago": 96},
-        {"process_name": "Payment Processing", "event_type": "Fraud Detection Bypass", "severity": 5, "likelihood": 5, "hours_ago": 24},
+# ---------------------------------------------------------------------------
+# Real-time data source configuration
+# Configure your actual data sources here instead of seed data
+# ---------------------------------------------------------------------------
 
-        {"process_name": "Data Pipeline", "event_type": "Schema Mismatch", "severity": 3, "likelihood": 4, "hours_ago": 220},
-        {"process_name": "Data Pipeline", "event_type": "Data Loss", "severity": 4, "likelihood": 3, "hours_ago": 180},
-        {"process_name": "Data Pipeline", "event_type": "ETL Failure", "severity": 4, "likelihood": 4, "hours_ago": 120},
-        {"process_name": "Data Pipeline", "event_type": "Corrupt Batch", "severity": 5, "likelihood": 3, "hours_ago": 60},
-        {"process_name": "Data Pipeline", "event_type": "Replication Lag", "severity": 3, "likelihood": 5, "hours_ago": 12},
+# Example database configuration (uncomment and configure as needed):
+# DATABASE_CONFIG = {
+#     'type': 'mongodb',  # or 'postgresql', 'api', etc.
+#     'uri': os.environ.get('DATABASE_URI', 'mongodb://localhost:27017/risk-platform'),
+#     'collection': 'events'
+# }
 
-        {"process_name": "User Authentication", "event_type": "Brute Force Attempt", "severity": 5, "likelihood": 5, "hours_ago": 230},
-        {"process_name": "User Authentication", "event_type": "Unauthorized Access", "severity": 5, "likelihood": 3, "hours_ago": 190},
-        {"process_name": "User Authentication", "event_type": "Session Hijack", "severity": 4, "likelihood": 2, "hours_ago": 150},
-        {"process_name": "User Authentication", "event_type": "MFA Bypass Attempt", "severity": 3, "likelihood": 2, "hours_ago": 100},
-        {"process_name": "User Authentication", "event_type": "Token Expiry Issue", "severity": 2, "likelihood": 2, "hours_ago": 30},
+# Example external API configuration:
+# API_CONFIG = {
+#     'type': 'webhook',
+#     'endpoint': os.environ.get('DATA_SOURCE_API', 'http://your-system:port/api/events'),
+#     'auth_token': os.environ.get('API_AUTH_TOKEN', '')
+# }
 
-        {"process_name": "Order Fulfillment", "event_type": "Delay", "severity": 3, "likelihood": 4, "hours_ago": 210},
-        {"process_name": "Order Fulfillment", "event_type": "Stock Discrepancy", "severity": 3, "likelihood": 3, "hours_ago": 170},
-        {"process_name": "Order Fulfillment", "event_type": "Carrier API Failure", "severity": 3, "likelihood": 3, "hours_ago": 130},
-        {"process_name": "Order Fulfillment", "event_type": "Address Validation Error", "severity": 2, "likelihood": 4, "hours_ago": 80},
-        {"process_name": "Order Fulfillment", "event_type": "Return Processing Failure", "severity": 3, "likelihood": 3, "hours_ago": 40},
-
-        {"process_name": "Inventory Management", "event_type": "Sync Error", "severity": 2, "likelihood": 3, "hours_ago": 200},
-        {"process_name": "Inventory Management", "event_type": "Count Mismatch", "severity": 2, "likelihood": 2, "hours_ago": 160},
-        {"process_name": "Inventory Management", "event_type": "Supplier Feed Delay", "severity": 1, "likelihood": 3, "hours_ago": 110},
-        {"process_name": "Inventory Management", "event_type": "Barcode Scan Error", "severity": 1, "likelihood": 2, "hours_ago": 70},
-        {"process_name": "Inventory Management", "event_type": "Warehouse System Lag", "severity": 2, "likelihood": 2, "hours_ago": 20},
-
-        {"process_name": "Audit Logging", "event_type": "Log Write Failure", "severity": 1, "likelihood": 2, "hours_ago": 215},
-        {"process_name": "Audit Logging", "event_type": "Storage Full Warning", "severity": 2, "likelihood": 2, "hours_ago": 175},
-        {"process_name": "Audit Logging", "event_type": "Log Rotation Error", "severity": 2, "likelihood": 1, "hours_ago": 135},
-        {"process_name": "Audit Logging", "event_type": "Compliance Breach", "severity": 5, "likelihood": 5, "hours_ago": 48},
-        {"process_name": "Audit Logging", "event_type": "Tamper Detection Alert", "severity": 5, "likelihood": 4, "hours_ago": 6},
-
-        {"process_name": "Notification Service", "event_type": "SMS Delivery Failure", "severity": 2, "likelihood": 4, "hours_ago": 90},
-        {"process_name": "Notification Service", "event_type": "Email Queue Overflow", "severity": 3, "likelihood": 3, "hours_ago": 45},
-        {"process_name": "Notification Service", "event_type": "Push Token Invalid", "severity": 1, "likelihood": 5, "hours_ago": 10},
-
-        {"process_name": "Reporting Engine", "event_type": "Report Timeout", "severity": 2, "likelihood": 3, "hours_ago": 185},
-        {"process_name": "Reporting Engine", "event_type": "Data Export Failure", "severity": 3, "likelihood": 2, "hours_ago": 115},
-        {"process_name": "Reporting Engine", "event_type": "Dashboard Crash", "severity": 4, "likelihood": 3, "hours_ago": 55},
-    ]
-
-    now_ms = datetime.now(timezone.utc).timestamp() * 1000
-    for i, s in enumerate(samples):
-        ts_ms = now_ms - s["hours_ago"] * 3_600_000
-        ts = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
-        events.append({
-            "id": f"seed-{i + 1}",
-            "process_name": s["process_name"],
-            "event_type": s["event_type"],
-            "severity": s["severity"],
-            "likelihood": s["likelihood"],
-            "timestamp": ts,
-            "source": "seed",
-        })
-
-    for event in events:
-        if with_risk(event)["risk_level"] == "High":
-            create_alert(with_risk(event))
+def load_initial_events_from_source():
+    """
+    Load initial events from your real data source.
+    Currently configured to start fresh with no seed data.
+    Replace this with your actual database/API calls.
+    """
+    logging.info("Starting with fresh event store. Configure DATA_SOURCE_URI to load real data.")
+    # TODO: Implement your actual data source here:
+    # For MongoDB: client = pymongo.MongoClient(DATABASE_CONFIG['uri'])
+    # For PostgreSQL: conn = psycopg2.connect(DATABASE_CONFIG['uri'])
+    # For REST API: requests.get(API_CONFIG['endpoint'])
+    pass
 
 
-seed_sample_data()
+# Load events from your actual data source
+load_initial_events_from_source()
 
 
 # ---------------------------------------------------------------------------
@@ -784,26 +751,68 @@ def stream():
     )
 
 
-def automation_worker():
-    templates = [
-        "Automation health scan",
-        "Auto follow-up alert",
-        "Batch risk recheck",
-        "Automated process validation",
-        "System resiliency event",
-    ]
-
-    while automation_enabled:
-        time.sleep(18)
-        if len(events) >= 120:
-            continue
-
-        if random.random() < 0.65:
-            process_name = random.choice([e["process_name"] for e in events]) if events else "Automation Engine"
-            event_type = random.choice(templates)
-            severity = random.randint(1, 5)
-            likelihood = random.randint(1, 5)
-            create_event_entry(process_name, event_type, severity, likelihood, source='automation')
+def sync_events_from_source():
+    """
+    Continuously monitor system metrics and create risk events in real-time.
+    Uses psutil to fetch actual CPU, memory, and process data.
+    """
+    while True:
+        try:
+            # Get real-time system metrics
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory_info = psutil.virtual_memory()
+            memory_percent = memory_info.percent
+            
+            # Determine severity and likelihood based on actual metrics
+            cpu_severity = 5 if cpu_percent > 85 else (4 if cpu_percent > 70 else (3 if cpu_percent > 50 else (2 if cpu_percent > 30 else 1)))
+            cpu_likelihood = 5 if cpu_percent > 85 else (4 if cpu_percent > 70 else (3 if cpu_percent > 50 else (2 if cpu_percent > 30 else 1)))
+            
+            memory_severity = 5 if memory_percent > 85 else (4 if memory_percent > 70 else (3 if memory_percent > 50 else (2 if memory_percent > 30 else 1)))
+            memory_likelihood = 5 if memory_percent > 85 else (4 if memory_percent > 70 else (3 if memory_percent > 50 else (2 if memory_percent > 30 else 1)))
+            
+            # Create event for CPU metrics
+            create_event_entry(
+                process_name="System Monitor - CPU",
+                event_type=f"CPU Usage: {cpu_percent:.1f}%",
+                severity=cpu_severity,
+                likelihood=cpu_likelihood,
+                source="system"
+            )
+            
+            # Create event for Memory metrics
+            create_event_entry(
+                process_name="System Monitor - Memory",
+                event_type=f"Memory Usage: {memory_percent:.1f}% ({memory_info.used // (1024**3)}GB / {memory_info.total // (1024**3)}GB)",
+                severity=memory_severity,
+                likelihood=memory_likelihood,
+                source="system"
+            )
+            
+            # Monitor top processes by memory usage
+            try:
+                top_processes = sorted(psutil.process_iter(['pid', 'name', 'memory_percent']), 
+                                      key=lambda p: p.info['memory_percent'], reverse=True)[:3]
+                for proc in top_processes:
+                    if proc.info['memory_percent'] and proc.info['memory_percent'] > 5:
+                        proc_severity = 5 if proc.info['memory_percent'] > 30 else (4 if proc.info['memory_percent'] > 20 else (3 if proc.info['memory_percent'] > 10 else 2))
+                        create_event_entry(
+                            process_name=f"Process Monitor - {proc.info['name']}",
+                            event_type=f"High Memory: {proc.info['memory_percent']:.1f}%",
+                            severity=proc_severity,
+                            likelihood=3,
+                            source="system"
+                        )
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+            
+            logging.info(f"System metrics - CPU: {cpu_percent:.1f}%, Memory: {memory_percent:.1f}%")
+            
+            # Wait 10 seconds before next sync
+            time.sleep(10)
+            
+        except Exception as e:
+            logging.error(f"Error syncing system metrics: {e}")
+            time.sleep(10)
 
 
 @app.route("/api/health")
@@ -812,7 +821,9 @@ def api_health():
 
 
 if __name__ == "__main__":
-    thread = threading.Thread(target=automation_worker, daemon=True)
+    # Start real-time data sync thread instead of automation worker
+    thread = threading.Thread(target=sync_events_from_source, daemon=True)
     thread.start()
     port = int(os.environ.get("PORT", 5000))
+    logging.info("Risk Platform started. No seed data loaded. Connect your real-time data source via API.")
     app.run(host="0.0.0.0", port=port, debug=False)
